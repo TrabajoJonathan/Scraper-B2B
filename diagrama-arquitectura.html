@@ -1,0 +1,147 @@
+<title>Codeflow — Buscador de leads B2B · plano + contexto</title>
+<style>
+  :root{
+    --ground:#0c1a29;--sheet:#0f2135;--panel:#13293f;--grid:#20405c;
+    --accent:#38bdf8;--safe:#34d399;--reason:#fbbf24;--risk:#f87171;
+    --ink:#dce9f4;--muted:#8aa6bd;
+    --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);line-height:1.55;}
+  .wrap{max-width:980px;margin:0 auto;padding:2.5rem 1.25rem 4rem;}
+  header{border-bottom:1px solid var(--grid);padding-bottom:1.25rem;margin-bottom:1.75rem;}
+  .kicker{font-family:var(--mono);font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);margin:0 0 .55rem;}
+  h1{font-size:clamp(1.5rem,4vw,2.1rem);margin:0 0 .4rem;letter-spacing:-.01em;text-wrap:balance;}
+  .sub{color:var(--muted);margin:0;max-width:62ch;}
+  h2{font-family:var(--mono);font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:2.25rem 0 .9rem;border-top:1px solid var(--grid);padding-top:1.25rem;}
+  .ctx{display:grid;gap:1rem;}
+  .card{background:var(--sheet);border:1px solid var(--grid);border-radius:10px;padding:1rem 1.15rem;}
+  .card h3{margin:0 0 .35rem;font-size:.95rem;color:var(--ink);}
+  .card p{margin:0;color:#b7cadb;font-size:.9rem;}
+  .card p+p{margin-top:.5rem;}
+  .card .tag{font-family:var(--mono);font-size:.7rem;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;}
+  b.ok{color:var(--safe);} b.no{color:var(--risk);} b.q{color:var(--reason);}
+  .legend{display:flex;flex-wrap:wrap;gap:.6rem 1.25rem;margin:0 0 1.25rem;font-size:.8rem;font-family:var(--mono);}
+  .legend span{display:inline-flex;align-items:center;gap:.5rem;color:var(--muted);}
+  .dot{width:.85rem;height:.85rem;border-radius:3px;flex:none;}
+  .d-safe{background:var(--safe);} .d-stage{background:var(--accent);} .d-risk{background:var(--risk);} .d-route{background:#7db8e0;}
+  .sheet-d{
+    background:
+      linear-gradient(var(--grid) 1px,transparent 1px) 0 0/100% 26px,
+      linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/26px 100%,
+      var(--sheet);
+    background-blend-mode:soft-light;
+    border:1px solid var(--grid);border-radius:12px;padding:1.5rem 1rem;overflow-x:auto;
+  }
+  pre.mermaid{margin:0;display:flex;justify-content:center;min-width:680px;}
+  .foot{margin-top:1.75rem;font-family:var(--mono);font-size:.75rem;color:var(--muted);}
+  .foot .risk{color:var(--risk);}
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="kicker">Codeflow · herramienta interna de generación de clientes · plano + contexto</p>
+    <h1>Buscador de leads B2B — arquitectura</h1>
+    <p class="sub">Documento vivo: el diagrama muestra cómo funciona; el contexto de abajo explica el proyecto completo para cualquiera que lo lea (persona o IA), sin necesidad de más explicación.</p>
+  </header>
+
+  <h2>Contexto del proyecto</h2>
+  <div class="ctx">
+    <div class="card">
+      <span class="tag">Qué es</span>
+      <h3>La empresa y la herramienta</h3>
+      <p><b>Codeflow</b> es una empresa de IA y automatización para LATAM (foco Panamá). Vende automatizaciones, sitios web, IA local, etc. Este proyecto es una <b>herramienta interna</b> para encontrarle clientes a esos productos.</p>
+      <p>El operador dice qué producto quiere vender → la herramienta encuentra negocios que lo comprarían, consigue su contacto, los ordena por encaje y redacta un primer correo (que un humano revisa antes de enviar).</p>
+    </div>
+
+    <div class="card">
+      <span class="tag">Los dos modos</span>
+      <h3>El router pregunta: «¿qué producto quieres vender?»</h3>
+      <p><b>Modo 1 —</b> vender un producto de la <b>lista que da el jefe</b> (no las 5 líneas del pitch: una lista concreta).</p>
+      <p><b>Modo 2 —</b> escribes <b>cualquier producto</b> y Claude razona a <b class="ok">quién se lo venderías</b> — busca al <b class="ok">comprador</b>, no al productor. Ej: «pan» → restaurantes/hoteles (NO panaderías); «automatización legal» → firmas de abogados.</p>
+    </div>
+
+    <div class="card">
+      <span class="tag">Regla de diseño</span>
+      <h3>El canal de descubrimiento depende del PRODUCTO, no del modo</h3>
+      <p><b>Vacantes de empleo</b> → cuando vendes <b>automatización</b> (una vacante de rol repetitivo = una empresa que puede automatizarse).</p>
+      <p><b>Google Maps</b> → cuando vendes <b>web / local / otros</b>: el usuario elige <b>categoría + ubicación</b>. Son <b>dos herramientas con dos trabajos distintos</b>: la <b>Places API oficial de Google</b> <i>descubre</i> los negocios (nombre, dirección, teléfono, web, rating — <b class="no">no trae email</b>), y <b>Apify</b> <i>extrae</i> el contacto entrando al sitio web de cada uno (email, teléfono, redes públicas). El contacto viene de la propia web del negocio → la cascada de proveedores (Apollo/Hunter) queda como plan B.</p>
+    </div>
+
+    <div class="card">
+      <span class="tag">Decisiones del jefe</span>
+      <h3>LinkedIn y el modelo de IA</h3>
+      <p><b class="no">LinkedIn:</b> NO scrapeamos perfiles nosotros (riesgo de baneo/legal). El contacto sale de <b>web + internet + proveedores de enriquecimiento</b>. <i>Matiz: esos proveedores pueden tener datos de origen LinkedIn; lo que evitamos es scrapear perfiles nosotros mismos.</i></p>
+      <p><b>Modelo:</b> Claude Haiku 4.5 (barato y suficiente); usar la cuenta de <b>project manager</b>; ~$5 de crédito para empezar.</p>
+    </div>
+
+    <div class="card">
+      <span class="tag">Etapa actual</span>
+      <h3>Solo investigación — y no nos cerramos</h3>
+      <p>Esta semana es <b>solo diseño/investigación, no código</b>. Y como apenas arrancamos, <b>casi todo negocio es cliente potencial</b>: por eso la herramienta <b class="ok">PRIORIZA</b> (ordena a quién contactar primero), <b class="no">no descarta</b>. Lo único fijo es la <b>dirección</b> (venderle al comprador correcto), no el filtro.</p>
+    </div>
+  </div>
+
+  <h2>Cómo funciona — el pipeline</h2>
+  <div class="legend">
+    <span><i class="dot d-route"></i> Decisión (router)</span>
+    <span><i class="dot d-stage"></i> Etapa del pipeline</span>
+    <span><i class="dot d-safe"></i> Canal / paso de bajo riesgo</span>
+    <span><i class="dot d-risk"></i> Descartado por decisión</span>
+    <span><i class="dot" style="background:#fbbf24"></i> Diseñado, fuera de alcance v1</span>
+  </div>
+
+  <div class="sheet-d">
+<pre class="mermaid">
+%%{init:{"theme":"base","themeVariables":{
+  "fontFamily":"ui-monospace, monospace","fontSize":"13px",
+  "lineColor":"#3a6485","primaryColor":"#13293f","primaryTextColor":"#dce9f4",
+  "primaryBorderColor":"#3a6485","tertiaryColor":"#0f2135"
+}}}%%
+flowchart TD
+  U(["👤 Operador"]):::plain --> R
+  R{{"🧭 ROUTER<br/>¿Qué producto quieres vender?"}}:::route
+
+  R -->|"Modo 1 · lista de Codeflow"| P
+  R -->|"Modo 2 · producto libre"| B2["🧠 CEREBRO — Claude<br/>producto → ¿quién lo COMPRA / necesita?<br/>ej: automatización legal → firmas de abogados"]:::done
+  B2 --> P
+
+  P{"¿Qué canal de descubrimiento?<br/>DEPENDE DEL PRODUCTO, no del modo"}:::route
+  P -->|"producto = automatización<br/>(vacante = rol reemplazable)"| V["📋 VACANTES (scrapers en APIFY)<br/>Konzerta · Computrabajo · JobSpy<br/>⚠️ FUERA DE ALCANCE v1 — es el 2º canal"]:::pend
+  P -->|"producto = web / local / otros"| GM["🗺️ GOOGLE MAPS ✅ v1<br/>usuario elige categoría + ubicación<br/>PLACES API oficial DESCUBRE los negocios<br/>APIFY entra a su web y EXTRAE el contacto"]:::safe
+
+  V --> EX
+  GM --> EX
+  EX["🧹 Extracción + normalización → Supabase"]:::stage
+  EX --> EN["✉️ Contacto<br/>sale del sitio web del negocio (Apify)<br/>proveedores (Apollo/Hunter) solo si falta<br/>sin scrapear LinkedIn"]:::stage
+  EN --> SC["📊 PRIORIZAR leads<br/>ordenar por encaje — NO descartar<br/>(arranque: casi todo sirve)"]:::done
+  SC --> RD["🤖 Redacción del correo<br/>Claude Haiku 4.5"]:::stage
+  RD --> HR(["👀 Revisión humana → Envío"]):::plain
+
+  X["❌ LinkedIn<br/>no scrapeamos perfiles (decisión del jefe)"]:::risk
+  R -.->|"descartado"| X
+
+  classDef route fill:#0b3a52,stroke:#38bdf8,stroke-width:2px,color:#e6f6ff;
+  classDef stage fill:#13293f,stroke:#3a6485,color:#dce9f4;
+  classDef safe fill:#0e2f27,stroke:#34d399,color:#d7fbee;
+  classDef done fill:#0e2f27,stroke:#34d399,stroke-width:2px,color:#d7fbee;
+  classDef risk fill:#2c1414,stroke:#f87171,stroke-dasharray:4 4,color:#fbd2d2;
+  classDef pend fill:#2b2410,stroke:#fbbf24,stroke-dasharray:4 4,color:#fdf0cd;
+  classDef plain fill:#0f2135,stroke:#5a7893,color:#c4d6e6;
+</pre>
+  </div>
+
+  <p class="foot">Arquitectura · v3 — 25 jul 2026 · <b>diseño congelado</b> · alcance v1 = Modo 1 sobre Google Maps<br/>Fuente de verdad del plan: <b>ROADMAP.md</b> · del modelo de datos: <b>docs/DATABASE.md</b></p>
+</div>
+
+<!-- Mermaid para cuando se abre el archivo LOCAL (doble-clic). En el Artifact se ignora
+     (CSP bloquea CDNs) y el runtime lo renderiza nativo; el guard evita cualquier error. -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  window.addEventListener('load', function () {
+    if (window.mermaid && typeof window.mermaid.initialize === 'function') {
+      try { window.mermaid.initialize({ startOnLoad: true }); } catch (e) {}
+    }
+  });
+</script>

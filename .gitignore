@@ -1,0 +1,8 @@
+node_modules/
+.env
+.env.local
+
+# Salidas del spike de Places: contienen datos crudos de negocios reales.
+# Se revisan a mano, no se versionan.
+salidas/
+*.log

@@ -1,0 +1,27 @@
+{
+  "name": "codeflow-b2b-scraper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Modulo de Prospeccion Inteligente de Clientes - herramienta interna de Codeflow",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "hito05": "node --env-file=.env src/scripts/hito-0.5.ts",
+    "migrar": "node --env-file=.env src/scripts/aplicar-migraciones.ts",
+    "verificar": "node --env-file=.env src/scripts/verificar-esquema.ts",
+    "probar:fase1": "node --env-file=.env src/scripts/probar-fase1.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
+    "@supabase/supabase-js": "^2.58.0",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.0",
+    "typescript": "^5.9.0"
+  }
+}

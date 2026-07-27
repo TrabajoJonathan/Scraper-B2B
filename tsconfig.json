@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "es2024",
+    "lib": ["es2024"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+
+    // Node 24 ejecuta .ts directamente borrando los tipos (type stripping).
+    // No compilamos: tsc solo revisa tipos. De ahi estas tres opciones.
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    // Falla si escribimos sintaxis que Node NO puede borrar (enum, namespace,
+    // decoradores). Nos obliga a quedarnos en el subconjunto que corre nativo.
+    "erasableSyntaxOnly": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*.ts"]
+}
