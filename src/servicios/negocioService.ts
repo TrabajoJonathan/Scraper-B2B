@@ -135,6 +135,98 @@ export async function guardarDescubrimiento(
 }
 
 /**
+ * Guarda el contacto extraído y avanza el estado de la prospección (Fase 2).
+ *
+ * Dos reglas de diseño que se cumplen acá:
+ *
+ *  - **Priorizar, no descartar.** Sin email NO se borra nada: la prospección
+ *    pasa a `sin_contacto` y queda para revisar. El negocio sigue en la base.
+ *  - **No retroceder.** Solo se avanza desde `negocio_encontrado`. Si la
+ *    prospección ya iba en `aprobado` o `enviado`, una re-corrida de la Fase 2
+ *    no la devuelve a `contacto_encontrado`.
+ */
+export async function registrarContacto(
+  negocioId: string,
+  prospeccionId: string,
+  contacto: {
+    email: string | null;
+    telefono?: string | null;
+    redes?: Record<string, string> | null;
+    origen: string | null;
+    ofuscado?: boolean;
+  },
+): Promise<{ estadoNuevo: 'contacto_encontrado' | 'sin_contacto'; contactoId: string | null }> {
+  return enTransaccion(async (c) => {
+    let contactoId: string | null = null;
+
+    if (contacto.email !== null) {
+      // `origen_del_correo` tiene CHECK; si el extractor devuelve algo que no
+      // está en la lista, se guarda como null en vez de reventar la corrida.
+      const { rows } = await c.query<{ id: string }>(
+        `insert into contactos (negocio_id, email, telefono, redes, origen_del_correo, email_ofuscado)
+         values ($1, $2, $3, $4,
+           case when $5 in ('footer','contacto','about','mailto','facebook','instagram','places','manual','proveedor')
+                then $5 else null end,
+           $6)
+         on conflict (negocio_id, email) do update set
+           telefono          = coalesce(excluded.telefono, contactos.telefono),
+           redes             = coalesce(excluded.redes, contactos.redes),
+           origen_del_correo = coalesce(excluded.origen_del_correo, contactos.origen_del_correo),
+           email_ofuscado    = excluded.email_ofuscado
+         returning id`,
+        [
+          negocioId,
+          contacto.email,
+          contacto.telefono ?? null,
+          contacto.redes === undefined || contacto.redes === null
+            ? null
+            : JSON.stringify(contacto.redes),
+          contacto.origen,
+          contacto.ofuscado ?? false,
+        ],
+      );
+      contactoId = rows[0]!.id;
+    }
+
+    const estadoNuevo = contacto.email !== null ? 'contacto_encontrado' : 'sin_contacto';
+
+    await c.query(
+      `update prospecciones set estado = $2
+       where id = $1 and estado = 'negocio_encontrado'`,
+      [prospeccionId, estadoNuevo],
+    );
+
+    return { estadoNuevo, contactoId };
+  });
+}
+
+/**
+ * Marca como `sin_contacto` las prospecciones cuyo negocio NO tiene sitio web.
+ *
+ * ¿Por qué hace falta una función aparte? Porque `pendientesDeContacto` filtra
+ * por `sitio_web is not null`, así que un negocio sin web nunca entra a la
+ * Fase 2 — y por lo tanto nada lo marcaba: se quedaba en `negocio_encontrado`
+ * para siempre y el cron diario lo volvía a examinar todos los días sin que
+ * nunca pudiera avanzar.
+ *
+ * Lo encontró `npm run probar:fase2`: un negocio del fixture quedó varado.
+ *
+ * Correr esto al CERRAR la Fase 2 de una búsqueda, no al abrirla.
+ */
+export async function marcarSinWeb(busquedaId: string): Promise<number> {
+  const { rowCount } = await poolPostgres().query(
+    `update prospecciones p set estado = 'sin_contacto'
+     from negocios n
+     where n.id = p.negocio_id
+       and p.busqueda_id = $1
+       and p.estado = 'negocio_encontrado'
+       and n.sitio_web is null`,
+    [busquedaId],
+  );
+  return rowCount ?? 0;
+}
+
+/**
  * Negocios de una búsqueda que tienen web y todavía no tienen contacto.
  * Es la entrada de la Fase 2.
  */

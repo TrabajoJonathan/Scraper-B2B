@@ -22,8 +22,14 @@
  *  5. Sushi Kobe        — con web pero SIN rating ni reseñas → prueba el
  *                         respaldo del dato personalizador
  *  6. Napoli            — CLOSED_PERMANENTLY → no se le debe escribir
+ *  7. Don Nico          — OPERATIONAL con web, pero su sitio solo tiene
+ *                         formulario de contacto → camino `sin_contacto` por
+ *                         "el sitio respondió pero no hay email". Va separado
+ *                         de Napoli a propósito: si el único sitio sin email
+ *                         fuera el del negocio cerrado, ese camino nunca se
+ *                         ejercitaría (el cerrado no llega a la Fase 2).
  *
- * Además viene paginado (5 + 1) para ejercitar el manejo de `nextPageToken`.
+ * Además viene paginado (5 + 2) para ejercitar el manejo de `nextPageToken`.
  */
 
 import type { RespuestaBusqueda } from '../core/places.ts';
@@ -120,6 +126,21 @@ const PAGINA_2: RespuestaBusqueda = {
       businessStatus: 'CLOSED_PERMANENTLY',
       googleMapsUri: 'https://maps.google.com/?cid=FIXTURE006',
     },
+    {
+      // Abierto y con web, pero su sitio solo tiene formulario de contacto.
+      id: 'FIXTURE_places/ChIJnico007',
+      displayName: { text: 'Parrillada Don Nico', languageCode: 'es' },
+      formattedAddress: 'San Francisco, Ciudad de Panamá, Panamá',
+      nationalPhoneNumber: '270-4455',
+      websiteUri: 'https://donnico.com.pa',
+      rating: 4.1,
+      userRatingCount: 233,
+      types: ['barbecue_restaurant', 'restaurant'],
+      primaryType: 'barbecue_restaurant',
+      primaryTypeDisplayName: { text: 'Parrillada', languageCode: 'es' },
+      businessStatus: 'OPERATIONAL',
+      googleMapsUri: 'https://maps.google.com/?cid=FIXTURE007',
+    },
   ],
   // Sin nextPageToken: aquí se acabó.
 };
@@ -137,4 +158,8 @@ export function lectorDeFixture(): (params: {
   };
 }
 
-export const TOTAL_EN_FIXTURE = 6;
+export const TOTAL_EN_FIXTURE = 7;
+/** Cerrados permanentemente: se guardan pero no se prospectan. */
+export const CERRADOS_EN_FIXTURE = 1;
+/** Sin sitio web en su ficha de Places. */
+export const SIN_WEB_EN_FIXTURE = 1;

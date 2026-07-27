@@ -88,8 +88,14 @@ export type Contacto = {
   email: string | null;
   telefono: string | null;
   redes: Record<string, string> | null;
-  /** Via B1: de donde salio el dato. 'footer' | 'about' | 'facebook' | ... */
+  /** Via B1: DONDE salio el dato. 'footer' | 'contacto' | 'mailto' | ... */
   origen_del_correo: string | null;
+  /**
+   * COMO estaba escrito: venia ofuscado ("x (arroba) y.com") para esquivar bots.
+   * Eje distinto de `origen_del_correo`. Senal de que el negocio no quiere
+   * correo automatizado — a considerar antes de aprobar envio. Migracion 009.
+   */
+  email_ofuscado: boolean;
   estado_verificacion: EstadoVerificacion;
   creado_en: string;
 };

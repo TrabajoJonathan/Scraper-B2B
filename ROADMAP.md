@@ -263,10 +263,11 @@ Elegir producto → canal. Places API: categoría + ubicación → negocios real
 Falta solo cambiar el lector de fixture por la llamada real — es un parámetro, no código nuevo.
 
 > **Cómo se probó sin la llave:** el lector de Places se **inyecta** en `buscar()`. En producción
-> es el cliente HTTP real; en la prueba, un fixture en `src/fixtures/` con 6 negocios sintéticos
+> es el cliente HTTP real; en la prueba, un fixture en `src/fixtures/` con 7 negocios sintéticos
 > que ejercitan los casos borde a propósito: 2 sucursales de una cadena con el mismo dominio, uno
-> sin web, uno sin rating, uno cerrado permanentemente, y respuesta paginada. Así el pipeline queda
-> validado hoy y cuando llegue la llave no se estrena código sin probar.
+> sin web, uno sin rating, uno cerrado permanentemente, uno cuyo sitio solo tiene formulario, y
+> respuesta paginada. Así el pipeline queda validado hoy y cuando llegue la llave no se estrena
+> código sin probar.
 >
 > ⚠️ Los fixtures **no dicen nada sobre la realidad panameña** — la cobertura real de campos sigue
 > dependiendo del spike del Hito 0.5. Prueban el código, no el mercado.
@@ -278,13 +279,39 @@ justamente para poder ver el número antes de lanzarlo en serio.
 
 ---
 
-### Fase 2 · Contacto ✉️
-Apify entra a la web de cada negocio → contacto público.
-- [ ] Servicio `apifyService`: dado un negocio con web → email / teléfono / redes
-- [ ] Guardar en `contactos` con **origen_del_correo** (footer / about / facebook / instagram)
-- [ ] Marcar `contacto_encontrado`; si no hay web/email → `sin_contacto` (NO borrar)
+### Fase 2 · Contacto ✉️ 🟢 *lógica lista y probada (31/31)*
+Entrar a la web de cada negocio → contacto público.
+- [x] Servicio `contactoService`: dado un negocio con web → email / redes. **Provisional** (`fetch` +
+      regex); se reemplaza por Apify reescribiendo SOLO ese archivo, la firma no cambia
+- [x] Recorre varias rutas (`/`, `/contacto`, `/contact`, `/contactenos`, `/nosotros`, `/about`) y
+      **para en la primera que dé email** — con Apify cada petición se factura
+- [x] **Desofusca** `(arroba)` / `[at]` / `(punto)`: sin esto se pierde el lead completo, no un dato
+- [x] Prioriza candidatos: dominio propio > `info@`/`ventas@` > gmail suelto
+- [x] Filtra basura (DSN de Sentry, assets `@2x`, `noreply`, plantillas)
+- [x] Guardar en `contactos` con **origen_del_correo** + **email_ofuscado** (migración `009`)
+- [x] Rescata redes (Instagram/Facebook/WhatsApp) aunque el email esté en otra página
+- [x] Marcar `contacto_encontrado`; si no hay email → `sin_contacto` (**NO borrar**)
+- [x] `marcarSinWeb()` — cierra a los que no tienen web (ver el bug de abajo)
+- [x] **No retrocede:** una prospección en `aprobado` no vuelve a `contacto_encontrado`
+- [x] **Probado contra la base real: `npm run probar:fase2` → 31/31** ✅
+- [ ] Cambiar el `fetch` provisional por Apify ← falta la cuenta
 
-**Entregable:** Negocios con su correo (aunque sea genérico `info@`). **Esfuerzo:** M · **Depende de:** Fase 1 + **cuenta de Apify** · **Estado:** ⏸ esperando Apify *(mientras tanto: mete 2-3 negocios de prueba a mano para no bloquearte)*
+**Entregable:** Negocios con su correo (aunque sea genérico `info@`). **Esfuerzo:** M
+**Estado:** 🟢 **lógica completa y probada** con 6 patrones de sitio panameño en fixtures.
+
+> 🐛 **Bug que encontró la prueba:** un negocio **sin sitio web** nunca entraba a la Fase 2
+> (`pendientesDeContacto` filtra por `sitio_web is not null`), así que **nada lo marcaba jamás**:
+> se quedaba en `negocio_encontrado` y el cron diario lo iba a re-examinar todos los días sin que
+> pudiera avanzar nunca. Se agregó `marcarSinWeb()`, que hay que correr al **cerrar** la Fase 2 de
+> una búsqueda. Ahora no queda ninguna prospección varada.
+>
+> 💡 **Se confirmó el caso del fix (b):** las 2 sucursales de la cadena cayeron en el **mismo**
+> `reservas@laterraza.com.pa`. En la Fase 5 eso serían 2 borradores al mismo buzón — los detecta
+> `v_buzones_saturados` y el operador aprueba uno, no dos.
+>
+> 🔵 **Decisión que aparece aquí:** ¿se le escribe a un negocio que **ofuscó** su email a propósito?
+> Ofuscarlo es una señal explícita de que no quiere correo automatizado. Hoy se guarda con la marca
+> `email_ofuscado` y **sí** es enviable. Vale revisarlo junto con la decisión #6 (`catch_all`).
 
 ---
 
@@ -361,11 +388,17 @@ Cron diario **incremental** (para aislar errores).
 **Entregable:** No quemamos el dominio. **Esfuerzo:** S · **Depende de:** Fase 3
 
 ### B3 · Documentación técnica 📚 (máximo ROI — casi todo es escritura)
-- [ ] `docs/ARCHITECTURE.md` — capas, regla de dependencia, servicios por herramienta
-- [ ] `docs/DATABASE.md` — tablas, estados del lead, dedup, migraciones
-- [ ] `docs/SECURITY.md` — Ley 81, datos públicos, opt-out, qué NO se recolecta
+- [x] `docs/ARCHITECTURE.md` — capas, regla de dependencia, servicios por herramienta
+- [x] `docs/DATABASE.md` — tablas, estados, dedup, los 4 fixes, migraciones
 - [ ] `docs/DEPLOYMENT.md` — Vercel, Supabase, cron, variables de entorno
-- [ ] `docs/USER_MANUAL.md` — cómo se usa el panel
+- [ ] `docs/USER_MANUAL.md` — cómo se usa el panel (con la Fase 6)
+- [ ] 🔵 **OPCIONAL** · `docs/SECURITY.md` — Ley 81, datos públicos, opt-out, qué NO se recolecta
+
+> **Sobre SECURITY.md:** queda como opcional por decisión del dev — el jefe no lo va a pedir.
+> Escribirlo si aparece alguno de estos tres casos: (1) se pide dictamen legal, (2) entra un cliente
+> de sector regulado (banca, salud, legal — la Línea 2 del pitch), o (3) llega un reclamo de opt-out.
+> El contenido ya está decidido y disperso: la postura legal está en `PROPUESTA-TECNICA.md` §4 y el
+> resumen en `docs/ARCHITECTURE.md`. Es juntarlo, no investigarlo.
 
 **Entregable:** Documentación seria. **Esfuerzo:** S-M · **Depende de:** núcleo estable (Fases 0–6)
 

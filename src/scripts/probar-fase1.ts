@@ -17,7 +17,12 @@ import {
   normalizarNombre,
 } from '../servicios/placesService.ts';
 import { registrarBusqueda, guardarDescubrimiento, pendientesDeContacto } from '../servicios/negocioService.ts';
-import { lectorDeFixture, TOTAL_EN_FIXTURE } from '../fixtures/places-restaurantes-panama.ts';
+import {
+  lectorDeFixture,
+  TOTAL_EN_FIXTURE,
+  CERRADOS_EN_FIXTURE,
+  SIN_WEB_EN_FIXTURE,
+} from '../fixtures/places-restaurantes-panama.ts';
 import { poolPostgres, cerrarPostgres } from '../core/postgres.ts';
 import type { SearchSpec } from '../dominio/tipos.ts';
 
@@ -63,7 +68,7 @@ try {
     `trae los ${TOTAL_EN_FIXTURE} negocios del fixture`,
     `obtuvo ${negocios.length}`,
   );
-  afirmar(llamadas === 2, 'paginó: 2 llamadas (5 + 1)', `llamadas=${llamadas}`);
+  afirmar(llamadas === 2, 'paginó: 2 llamadas (5 + 2)', `llamadas=${llamadas}`);
   afirmar(!huboMas, 'detectó que no hay más páginas');
 
   // El caso que motivó el fix del dedup: dos sucursales de una cadena.
@@ -93,11 +98,17 @@ try {
   const busquedaId = await registrarBusqueda(SPEC, 'lista_jefe');
   afirmar(busquedaId.length > 0, 'registra la búsqueda (el "por qué" de la corrida)');
 
+  const PROSPECTABLES = TOTAL_EN_FIXTURE - 1; // el cerrado permanentemente no cuenta
+
   const r1 = await guardarDescubrimiento(busquedaId, negocios);
-  afirmar(r1.negociosNuevos === 6, '1ª corrida: 6 negocios nuevos', JSON.stringify(r1));
   afirmar(
-    r1.prospeccionesNuevas === 5,
-    '1ª corrida: 5 prospecciones (el cerrado NO se prospecta)',
+    r1.negociosNuevos === TOTAL_EN_FIXTURE,
+    `1ª corrida: ${TOTAL_EN_FIXTURE} negocios nuevos`,
+    JSON.stringify(r1),
+  );
+  afirmar(
+    r1.prospeccionesNuevas === PROSPECTABLES,
+    `1ª corrida: ${PROSPECTABLES} prospecciones (el cerrado NO se prospecta)`,
     `nuevas=${r1.prospeccionesNuevas} omitidos=${r1.omitidosNoProspectables}`,
   );
   afirmar(r1.omitidosNoProspectables === 1, 'el cerrado permanentemente queda guardado pero sin prospección');
@@ -105,12 +116,12 @@ try {
   // Idempotencia: la misma búsqueda otra vez no debe duplicar nada.
   const r2 = await guardarDescubrimiento(busquedaId, negocios);
   afirmar(
-    r2.negociosNuevos === 0 && r2.negociosActualizados === 6,
-    '2ª corrida: 0 negocios nuevos, 6 actualizados',
+    r2.negociosNuevos === 0 && r2.negociosActualizados === TOTAL_EN_FIXTURE,
+    `2ª corrida: 0 negocios nuevos, ${TOTAL_EN_FIXTURE} actualizados`,
     JSON.stringify(r2),
   );
   afirmar(
-    r2.prospeccionesNuevas === 0 && r2.prospeccionesRepetidas === 5,
+    r2.prospeccionesNuevas === 0 && r2.prospeccionesRepetidas === PROSPECTABLES,
     '2ª corrida: 0 prospecciones nuevas (idempotente)',
     JSON.stringify(r2),
   );
@@ -119,8 +130,8 @@ try {
     `select count(*)::text as n from negocios where place_id like 'FIXTURE_%'`,
   );
   afirmar(
-    cuentaNegocios[0]!.n === '6',
-    'la base tiene 6 negocios, no 12',
+    cuentaNegocios[0]!.n === String(TOTAL_EN_FIXTURE),
+    `la base tiene ${TOTAL_EN_FIXTURE} negocios, no ${TOTAL_EN_FIXTURE * 2}`,
     `tiene ${cuentaNegocios[0]!.n}`,
   );
 
@@ -136,8 +147,8 @@ try {
     JSON.stringify(r3),
   );
   afirmar(
-    r3.prospeccionesNuevas === 5,
-    '(a) segunda búsqueda: SÍ crea 5 prospecciones nuevas',
+    r3.prospeccionesNuevas === PROSPECTABLES,
+    `(a) segunda búsqueda: SÍ crea ${PROSPECTABLES} prospecciones nuevas`,
     JSON.stringify(r3),
   );
 
@@ -154,10 +165,12 @@ try {
 
   console.log('\n=== ENTRADA DE LA FASE 2 ===\n');
 
+  // Prospectables con web = total − cerrado − el que no tiene web.
+  const ESPERADOS_FASE2 = TOTAL_EN_FIXTURE - CERRADOS_EN_FIXTURE - SIN_WEB_EN_FIXTURE;
   const pendientes = await pendientesDeContacto(busquedaId);
   afirmar(
-    pendientes.length === 4,
-    'quedan 4 pendientes de contacto (con web, sin email, no cerrados)',
+    pendientes.length === ESPERADOS_FASE2,
+    `quedan ${ESPERADOS_FASE2} pendientes de contacto (con web, sin email, no cerrados)`,
     `son ${pendientes.length}: ${pendientes.map((p) => p.nombre).join(', ')}`,
   );
   afirmar(
@@ -165,8 +178,12 @@ try {
     'todos los pendientes tienen sitio web',
   );
   afirmar(
-    pendientes[0]!.nombre.includes('Chela') === false,
+    !pendientes.some((p) => p.nombre.includes('Chela')),
     'el que no tiene web NO está en la cola de la Fase 2',
+  );
+  afirmar(
+    !pendientes.some((p) => p.nombre.includes('Nápoli')),
+    'el cerrado permanentemente NO está en la cola de la Fase 2',
   );
 
   console.log('\n=== TROCEO (pasar el techo de ~60) ===\n');
@@ -176,7 +193,7 @@ try {
 
   afirmar(
     t.negocios.length === TOTAL_EN_FIXTURE,
-    'dedup entre zonas: 6 únicos, no 18',
+    `dedup entre zonas: ${TOTAL_EN_FIXTURE} únicos, no ${TOTAL_EN_FIXTURE * zonas.length}`,
     `únicos=${t.negocios.length}`,
   );
   afirmar(

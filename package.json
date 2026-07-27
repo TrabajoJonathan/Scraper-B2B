@@ -12,6 +12,7 @@
     "migrar": "node --env-file=.env src/scripts/aplicar-migraciones.ts",
     "verificar": "node --env-file=.env src/scripts/verificar-esquema.ts",
     "probar:fase1": "node --env-file=.env src/scripts/probar-fase1.ts",
+    "probar:fase2": "node --env-file=.env src/scripts/probar-fase2.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
