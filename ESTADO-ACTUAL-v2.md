@@ -13,7 +13,7 @@
 > | Plan, alcance y orden de trabajo | `ROADMAP.md` |
 > | Contexto del negocio y decisiones del jefe | **este archivo** |
 > | Proveedores, precios, riesgo legal | `PROPUESTA-TECNICA.md` + `investigacion/` (respaldo) |
-> | Material para presentar | `PRESENTACION-PPT.md`, `flujo-diario.md`, `diagrama-arquitectura.html` |
+> | Material para presentar | `PRESENTACION-PPT.md`, `diagrama-arquitectura.html` |
 >
 > Estado: **diseño congelado · código en curso (Fase 0)** · v4 · 25 jul 2026 · Mercado: LATAM, foco Panamá.
 > **Alcance v1: Modo 1 sobre canal Google Maps, de punta a punta.**
@@ -127,4 +127,4 @@ Todo se apoya en lo que la empresa **ya paga** (Claude, Supabase, Vercel); el co
 
 ---
 
-*Vistas del mismo sistema: `diagrama-arquitectura.html` (arquitectura ramificada, visual) · `flujo-diario.md` (tubería lineal de 7 pasos, para presentar). Investigación detallada de proveedores/precios/riesgos legales: `PROPUESTA-TECNICA.md` (respaldo).*
+*Vista visual del sistema: `diagrama-arquitectura.html`. Arquitectura y modelo de datos congelados: `docs/ARCHITECTURE.md` y `docs/DATABASE.md`. Investigación de proveedores/precios/riesgos legales: `PROPUESTA-TECNICA.md` (respaldo).*

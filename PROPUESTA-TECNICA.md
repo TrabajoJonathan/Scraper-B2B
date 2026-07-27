@@ -103,7 +103,7 @@ muchos algoritmos — normalizar con cuidado).
 
 ### Etapa 4 — Scoring → ver diseño completo en `investigacion/04-scoring-encaje.md` y §5.
 
-### Etapa 5 — Redacción con Claude → ver `investigacion/05-claude-redaccion.md` y §6.
+### Etapa 5 — Redacción con Claude → ver §6 (ya implementado: `src/servicios/redaccionService.ts`).
 
 ---
 
@@ -245,13 +245,25 @@ ocupación ESCO/O*NET (multilingüe, sirve para español) → cruce con índice 
 
 ---
 
-## 6. Redacción con Claude (resumen — detalle en `investigacion/05-claude-redaccion.md`)
+## 6. Redacción con Claude — **YA IMPLEMENTADO**
 
-- **Modelo default: Claude Haiku 4.5** — ~**$0.0038/correo** (~$0.0026 con prompt caching del system prompt).
-  A 1.000 correos/mes ≈ **$2.6/mes**. **Sonnet 5** solo para cuentas de alto ticket (Línea 2 $5–20K).
-- Salida estructurada (`asunto`, `cuerpo`, `cta`); system prompt estable y cacheado con tono CodeFlow +
-  few-shot por línea; input por lead = datos + ángulo + dato personalizador del scoring.
-- **Human-in-the-loop** en los primeros ~50 correos; luego semi-automatizar. Batch API (−50%) para lotes.
+> Esta sección era investigación; ahora es código. Precios verificados contra el catálogo el
+> 2026-07-25 y codificados en `src/core/claude.ts`; el prompt vive en `src/servicios/redaccionService.ts`;
+> el costo real por correo lo imprime `npm run hito05`.
+
+- **Modelo default: Claude Haiku 4.5** ($1.00 / $5.00 por millón de tokens) → ~**$0.0038/correo**.
+  A 1.000 correos/mes ≈ **$3.8/mes**. **Sonnet 5** ($3/$15, promo $2/$10 hasta 2026-08-31) solo para
+  cuentas de alto ticket (Línea 2, $5–20K).
+- Salida estructurada (`asunto`, `cuerpo`, `cta`, `dato_personalizador_usado`) vía `output_config.format`:
+  la API garantiza la forma, no hay que parsear texto libre.
+- **Human-in-the-loop siempre**, no solo los primeros 50. Es decisión del proyecto, no una etapa.
+- Batch API (−50%) disponible para lotes no urgentes.
+
+> ⚠️ **Corrección a la estimación original.** La versión previa decía "~$0.0026 con prompt caching".
+> **Eso no se cumple:** el mínimo cacheable de Haiku 4.5 es **4096 tokens** y nuestro system prompt
+> ronda los 1500, así que el caché nunca se activa (sin error — simplemente no cachea). El costo real
+> es $0.0038. La diferencia es despreciable en dinero ($1/mes), pero el número correcto es el que va
+> al jefe. Si el system prompt llegara a pasar los 4096 tokens, ahí sí conviene activarlo.
 
 ---
 
@@ -326,5 +338,6 @@ Línea 1 (su motor de revenue); el costo por lead es bajo (~$0.12) y escalable; 
 
 ### Anexos (en `investigacion/`)
 - `04-scoring-encaje.md` — diseño detallado del scoring y señales por línea.
-- `05-claude-redaccion.md` — cálculo de costo por correo y prompting.
+- ~~`05-claude-redaccion.md`~~ — eliminado: lo reemplazó código. Precios en `src/core/claude.ts`,
+  prompt en `src/servicios/redaccionService.ts`, costo real medido por `npm run hito05`. Ver §6.
 - `00-contexto-codeflow.md` — perfil de la empresa (del pitch).

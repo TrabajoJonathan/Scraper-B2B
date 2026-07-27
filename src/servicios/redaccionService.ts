@@ -11,7 +11,9 @@ import type { NegocioDescubierto } from '../dominio/tipos.ts';
  * System prompt. Estable a proposito (si algun dia pasa de 4096 tokens, se
  * vuelve cacheable en Haiku 4.5 y conviene activar prompt caching).
  *
- * Las reglas salen del diseno en investigacion/05-claude-redaccion.md.
+ * Las reglas de tono salen del diseno original; el detalle vive ahora en
+ * PROPUESTA-TECNICA.md §6 (el .md de investigacion se elimino: lo reemplazo
+ * este codigo).
  */
 const SYSTEM = `Eres el redactor de correos de prospeccion en frio de Codeflow, una empresa de IA y automatizacion para LATAM con foco en Panama.
 

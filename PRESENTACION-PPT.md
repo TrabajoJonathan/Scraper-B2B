@@ -176,4 +176,4 @@ Revisión humana → Envío
 
 ---
 
-*Documento fuente de verdad del proyecto: `ESTADO-ACTUAL-v2.md`. Diagrama visual: `diagrama-arquitectura.html`. Flujo lineal: `flujo-diario.md`. Investigación detallada (proveedores/precios/legal): `PROPUESTA-TECNICA.md`.*
+*El plan y el alcance mandan en `ROADMAP.md`. Contexto del negocio: `ESTADO-ACTUAL-v2.md`. Diagrama visual: `diagrama-arquitectura.html`. Investigación detallada (proveedores/precios/legal): `PROPUESTA-TECNICA.md`.*
