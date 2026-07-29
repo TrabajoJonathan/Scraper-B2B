@@ -315,13 +315,43 @@ Entrar a la web de cada negocio → contacto público.
 
 ---
 
-### Fase 3 · Verificar + limpiar ✅
+### Fase 3 · Verificar + limpiar ✅ 🟢 *lógica lista y probada (23/23)*
 Verificar el email antes de que exista cualquier envío → protege el dominio.
-- [ ] Servicio `verificarService` (MillionVerifier): estado por email
-- [ ] Escribir el resultado SOLO en `contactos.estado_verificacion`: `verificado` · `catch_all` · `invalido` · `no_encontrado` (el estado del lead NO cambia por esto)
-- [ ] Dedup fino (mismo negocio por dos búsquedas, mismo email en varios negocios)
 
-**Entregable:** Lista limpia con calidad de email marcada. **Esfuerzo:** S · **Depende de:** Fase 2
+**Para qué existe esta fase:** mandar correo a direcciones muertas sube la tasa de rebote, y una
+tasa alta hace que Gmail/Outlook manden **todo** nuestro correo a spam — incluido el que sí llega a
+clientes reales. El estándar de la industria es rebote **< 2%**.
+
+- [x] Servicio `verificarService` (MillionVerifier): estado por email
+- [x] Escribir el resultado SOLO en `contactos.estado_verificacion` (el estado de la prospección NO cambia por esto)
+- [x] **Verificar por email ÚNICO, no por fila de `contactos`** — ver abajo, es la decisión que importa
+- [x] Dedup fino: `buzonesCompartidos()` reporta los buzones que comparten varios negocios
+- [x] Migración `010`: `verificado_en` (la validez del email caduca) y `es_rol` (argumento legal)
+- [x] Idempotente: no re-cobra lo ya verificado, pero permite forzar re-verificación por antigüedad
+- [x] Una falla de configuración (llave inválida, sin créditos) **revienta** en vez de marcar emails buenos como malos
+- [x] **Probado contra la base real: `npm run probar:fase3` → 23/23** ✅
+- [ ] Cambiar el fixture por la llamada real ← falta la llave de MillionVerifier
+
+**Entregable:** Lista limpia con calidad de email marcada. **Esfuerzo:** S
+**Estado:** 🟢 **lógica completa y probada**, encadenada con las Fases 1 y 2.
+
+> 💰 **La decisión que importa: se verifica por EMAIL ÚNICO, no por contacto.**
+>
+> Ya sabemos que las sucursales de una cadena comparten buzón. En la prueba: **3 llamadas a la API
+> actualizaron 4 filas.** Verificar fila por fila traía dos problemas:
+> 1. **Cuesta plata de más** — se paga dos veces la misma respuesta.
+> 2. **Deja las filas inconsistentes** — la detección de `catch_all` no es determinista, así que dos
+>    llamadas al mismo email pueden dar resultados distintos. Terminarías con una sucursal
+>    `verificado` y la otra `catch_all`, sin razón para preferir una.
+>
+> La propagación es **global**, no limitada a la búsqueda: si el email aparece en otra búsqueda, ya
+> queda resuelto. A escala eso importa — en una cadena de 15 locales son 14 verificaciones ahorradas.
+>
+> ⚖️ **`es_rol` refuerza la postura legal.** El verificador dice gratis si el buzón es de rol
+> (`info@`, `ventas@`) o de una persona. Un buzón de rol **no identifica a un individuo**, así que
+> es mucho menos "dato personal" bajo la Ley 81. Poder decirle a un abogado *"el 90% de nuestra base
+> son buzones de rol"* es un dato medible, no una opinión. Viene en la misma llamada: no guardarlo
+> significaría pagar otra verificación después solo para saberlo.
 
 ---
 
