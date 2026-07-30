@@ -411,25 +411,104 @@ sumando, un negocio con plata y sitio impecable saldría alto, y ese no compra.
 
 ---
 
-### Fase 5 · Redacción 🤖
-Claude Haiku → primer correo por lead.
-- [ ] Servicio `redaccionService`: dado un lead → asunto + cuerpo + CTA
-- [ ] Usar un **dato personalizador** del negocio (rating, servicio, ubicación)
-- [ ] Guardar en `correos` con `modelo` usado y estado `correo_generado`
+### Fase 5 · Redacción 🤖 🟢 *lógica lista y probada (28/28)*
+Claude Haiku → primer correo por lead, y el flujo de revisión humana.
+- [x] Servicio `redaccionService`: dado un lead → asunto + cuerpo + CTA + dato usado
+- [x] Usar un **dato personalizador** del negocio. **Sin dato, no se redacta**: un correo en frío
+      genérico es spam, así que se cuenta en `sinPersonalizador` y se salta
+- [x] Guardar en `correos` con `modelo` usado y estado `correo_generado`
+- [x] **Un borrador por BUZÓN, no por prospección** — ver abajo
+- [x] `revisionService`: `aprobar` / `editar` / `descartar` / `colaDeRevision`
+- [x] Auditoría completa (quién y cuándo), **exigida por la base**, no por el código
+- [x] **Probado: `npm run probar:fase5` → 28/28** ✅ — el pipeline entero, 1→2→3→4→5
+- [ ] Cambiar el generador de fixture por Claude ← falta la llave
 
-**Entregable:** Borrador de correo por lead. **Esfuerzo:** M · **Depende de:** Fase 4
-**👉 Al terminar esta fase ya hay un correo real de punta a punta.**
+**Entregable:** Borrador por lead + cola de revisión. **Esfuerzo:** M · **Estado:** 🟢 lista.
+
+> 💰 **Un borrador por buzón, no por prospección.** Mismo criterio que en la Fase 3, y por lo mismo:
+> las 2 sucursales comparten `reservas@laterraza.com.pa`. Generar uno para cada una sería pagar dos
+> llamadas a Claude para un buzón que recibe UN correo, y obligar al operador a elegir entre dos
+> textos casi idénticos. Se genera para la prospección de mayor score de cada buzón; las otras quedan
+> en `priorizado` con la nota *"cubierta por el correo a un buzón compartido"*. En una cadena de 15
+> locales son 14 llamadas ahorradas.
+>
+> 🔒 **Las puertas se exigen al ESCRIBIR, no solo al leer.** `v_correos_enviables` ya filtra la
+> lectura, así que el panel nunca *muestra* algo que no debe enviarse. Pero eso protege contra un
+> panel bien hecho, no contra un script apurado o una ruta nueva que se olvide de usar la vista.
+> `aprobar()` vuelve a comprobar las tres puertas antes de escribir. Es redundante a propósito: la
+> puerta que sirve es la que está en el camino de la escritura.
+>
+> **Probado:** un correo que entró a la cola y *después* recibió opt-out ya no se puede aprobar —
+> y desaparece de la cola.
+>
+> 👥 **Concurrencia entre empleados.** `aprobar()` toma la fila con `for update`: si dos aprietan a la
+> vez, el segundo ve *"lo aprobó ana@..."* en vez de sobrescribir la auditoría del primero. Probado.
+>
+> 🐛 **Bug de robustez que encontró la prueba (el más importante hasta ahora):** el pool de Postgres
+> no tenía manejador de `'error'`. `pg.Pool` emite ese evento cuando el pooler de Supabase cierra una
+> conexión ociosa, y sin manejador **Node mata el proceso**. El test se cayó a mitad con
+> *"Connection terminated unexpectedly"*. En el cron de la Fase 7 —que va a tener el pool abierto
+> entre corridas— habría sido una caída silenciosa cada tanto, difícil de reproducir.
+> Se agregó el manejador, `keepAlive`, y dos timeouts (`statement_timeout`,
+> `idle_in_transaction_session_timeout`) para que un cuelgue falle rápido y legible en vez de dejar
+> un job zombi.
 
 ---
 
 ### Fase 6 · Panel + revisión 👀
-Panel en Vercel para ver/filtrar/aprobar. **El control humano vive aquí.**
+Aplicación web interna en **Vercel** donde los empleados buscan, revisan, priorizan y aprueban
+leads antes de enviar. **El control humano vive aquí.**
 - [ ] Panel: listar leads con filtros (categoría, ubicación, con/sin email, estado) y orden por score
 - [ ] Vista de revisión del correo: aprobar / editar / descartar antes de enviar
 - [ ] Contadores mínimos (leads, con email, pendientes, aprobados) — *sin dashboard pesado*
 - [ ] Estados `aprobado` / `descartado_por_humano`
+- [x] Columnas de auditoría (`aprobado_por`, `aprobado_en`, `editado_por`) — migración `012`, hecha antes a propósito
+- [ ] **Supabase Auth + políticas RLS** — hoy RLS está activo *sin políticas*, o sea la llave pública
+      está bloqueada (default seguro). Escribir esas políticas es trabajo real de esta fase
+- [ ] **Tabla `corridas` + progreso asíncrono** — ver la restricción de abajo
+- [ ] Paralelizar la descarga de sitios (hoy el bucle es en serie)
 
-**Entregable:** El operador ve todo y aprueba. **Esfuerzo:** L · **Depende de:** Fase 5
+**Entregable:** Los empleados ven todo y aprueban. **Esfuerzo:** L · **Depende de:** Fase 5
+
+> ## ⚠️ El pipeline NO cabe en una petición de Vercel
+>
+> Es la restricción que más condiciona el diseño de esta fase, y conviene tenerla escrita antes de
+> escribir la primera ruta.
+>
+> Una corrida real de una categoría:
+>
+> | Paso | Costo en tiempo |
+> |---|---|
+> | Descubrir ~60 negocios | ~24 llamadas a Places |
+> | Bajar 60 sitios web | **60 × hasta 8s = hasta 8 minutos en serie** |
+> | Verificar ~40 emails | 40 llamadas al verificador |
+>
+> Las funciones de Vercel se cortan en decenas de segundos (~60s en el plan gratis, ~300s en Pro —
+> **confirmar el número vigente antes de diseñar**). Un empleado que aprieta *"buscar restaurantes en
+> Panamá"* y espera la respuesta recibiría un **timeout, no una lista**.
+>
+> Esto no se arregla optimizando: el botón no puede *hacer* el trabajo, tiene que **encargarlo**.
+>
+> **Diseño propuesto** — reutiliza el cron que ya está planeado para la Fase 7, en vez de sumar un
+> servicio de colas:
+>
+> ```
+> Empleado aprieta "Buscar"
+>    → se crea una fila en `corridas` (estado: pendiente)
+>    → responde al instante: "buscando, te aviso"
+> Cron cada minuto
+>    → toma la corrida pendiente y avanza UN paso
+>    → actualiza el progreso (12 de 60 negocios)
+> La UI lee esa fila y muestra la barra de progreso
+> ```
+>
+> Dos ventajas de regalo:
+> - Si algo falla a mitad, la corrida queda con su error **visible en la UI** en vez de morir en un
+>   log que nadie mira. Eso es **B4 (monitoreo)** casi gratis.
+> - Paralelizando las descargas (10 concurrentes), los 8 minutos bajan a ~50 segundos.
+>
+> **Y una regla que ya está lista:** el panel debe leer **solo de `v_correos_enviables`**, nunca de
+> las tablas directo. Así no puede saltarse por accidente las puertas de verificación y de opt-out.
 
 ---
 

@@ -5,6 +5,7 @@
  */
 
 import { generarEstructurado, costoUSD, MODELO_BARATO } from '../core/claude.ts';
+import { enTransaccion, poolPostgres } from '../core/postgres.ts';
 import type { NegocioDescubierto } from '../dominio/tipos.ts';
 
 /**
@@ -63,6 +64,17 @@ export type Borrador = {
 };
 
 /**
+ * Generador inyectable. En producción es Claude; en pruebas, un fixture.
+ * Mismo patrón que el lector de Places y el de sitios web: permite probar la
+ * persistencia y el flujo de revisión sin gastar créditos ni esperar la llave.
+ */
+export type Generador = (opciones: {
+  system: string;
+  usuario: string;
+  modelo: string;
+}) => Promise<{ borrador: Borrador; modelo: string; costoUSD: number }>;
+
+/**
  * Elige el dato personalizador a partir de lo que Places nos dio gratis.
  * Devuelve null si el negocio no trae ningun dato utilizable: en ese caso NO
  * se redacta, porque un correo sin dato concreto es spam.
@@ -83,13 +95,27 @@ export function elegirPersonalizador(n: NegocioDescubierto): string | null {
   return null;
 }
 
+/** El generador real: Claude con salida estructurada. */
+const generadorClaude: Generador = async ({ system, usuario, modelo }) => {
+  const { resultado, uso, modelo: usado } = await generarEstructurado<Borrador>({
+    modelo,
+    system,
+    usuario,
+    schema: SCHEMA as unknown as Record<string, unknown>,
+    maxTokens: 1500,
+  });
+  return { borrador: resultado, modelo: usado, costoUSD: costoUSD(uso, usado) };
+};
+
 export async function redactar(opciones: {
   negocio: NegocioDescubierto;
   /** El producto que se quiere vender (viene del searchSpec). */
   producto: string;
   modelo?: string;
+  generador?: Generador;
 }): Promise<{ borrador: Borrador; modelo: string; costoUSD: number }> {
   const { negocio, producto } = opciones;
+  const generador = opciones.generador ?? generadorClaude;
 
   const personalizador = elegirPersonalizador(negocio);
   if (personalizador === null) {
@@ -108,13 +134,174 @@ export async function redactar(opciones: {
     `Dato personalizador que DEBES usar: ${personalizador}`,
   ].join('\n');
 
-  const { resultado, uso, modelo } = await generarEstructurado<Borrador>({
-    modelo: opciones.modelo ?? MODELO_BARATO,
-    system: SYSTEM,
-    usuario,
-    schema: SCHEMA as unknown as Record<string, unknown>,
-    maxTokens: 1500,
-  });
+  return generador({ system: SYSTEM, usuario, modelo: opciones.modelo ?? MODELO_BARATO });
+}
 
-  return { borrador: resultado, modelo, costoUSD: costoUSD(uso, modelo) };
+// ---------------------------------------------------------------------------
+// Persistencia y generación en lote
+// ---------------------------------------------------------------------------
+
+/** Guarda un borrador y avanza la prospección a `correo_generado`. */
+export async function guardarBorrador(
+  prospeccionId: string,
+  contactoId: string,
+  borrador: Borrador,
+  modelo: string,
+): Promise<string> {
+  return enTransaccion(async (c) => {
+    const { rows } = await c.query<{ id: string }>(
+      `insert into correos (prospeccion_id, contacto_id, asunto, cuerpo, cta, modelo)
+       values ($1,$2,$3,$4,$5,$6)
+       on conflict (prospeccion_id, contacto_id) do update set
+         asunto = excluded.asunto,
+         cuerpo = excluded.cuerpo,
+         cta    = excluded.cta,
+         modelo = excluded.modelo
+       returning id`,
+      [prospeccionId, contactoId, borrador.asunto, borrador.cuerpo, borrador.cta, modelo],
+    );
+    await c.query(
+      `update prospecciones set estado = 'correo_generado'
+       where id = $1 and estado in ('priorizado', 'contacto_encontrado')`,
+      [prospeccionId],
+    );
+    return rows[0]!.id;
+  });
+}
+
+export type ResultadoGeneracion = {
+  candidatos: number;
+  generados: number;
+  /** Se saltaron por compartir buzón con uno ya generado. Ver abajo. */
+  omitidosPorBuzonCompartido: number;
+  sinPersonalizador: number;
+  costoUSD: number;
+};
+
+/**
+ * Genera borradores para los leads priorizados de una búsqueda.
+ *
+ * ===========================================================================
+ * UN BORRADOR POR BUZÓN, NO POR PROSPECCIÓN.
+ * ===========================================================================
+ *
+ * Mismo criterio que en la Fase 3 con el verificador, y por las mismas razones.
+ * Las 2 sucursales de una cadena comparten `reservas@laterraza.com.pa`. Generar
+ * un borrador para cada una significa:
+ *
+ *  - **pagar dos llamadas a Claude** para un buzón que va a recibir UN correo
+ *  - **obligar al operador a elegir** entre dos textos casi idénticos
+ *
+ * Así que se genera para la prospección de MAYOR score de cada buzón, y las
+ * demás se cuentan en `omitidosPorBuzonCompartido`. Quedan en `priorizado` con
+ * una nota en su razón: no se pierden, simplemente ya están cubiertas por el
+ * correo que sí se va a enviar.
+ *
+ * En una cadena de 15 locales eso son 14 llamadas ahorradas.
+ */
+export async function generarBorradores(
+  busquedaId: string,
+  opciones: { generador?: Generador; maximo?: number; modelo?: string } = {},
+): Promise<ResultadoGeneracion> {
+  const maximo = opciones.maximo ?? 100;
+
+  // Un candidato por buzón: el de mejor score. `distinct on` de Postgres es
+  // exactamente esto — la primera fila de cada grupo según el `order by`.
+  const { rows: candidatos } = await poolPostgres().query<{
+    prospeccion_id: string;
+    contacto_id: string;
+    email: string;
+    producto: string;
+    nombre: string;
+    categoria_google: string | null;
+    direccion: string | null;
+    sitio_web: string | null;
+    rating: string | null;
+    num_resenas: number | null;
+    hermanos: string;
+  }>(
+    `select distinct on (lower(ct.email))
+       p.id as prospeccion_id, ct.id as contacto_id, ct.email,
+       b.producto, n.nombre, n.categoria_google, n.direccion, n.sitio_web,
+       n.rating, n.num_resenas,
+       -- cuántas otras prospecciones de esta búsqueda comparten este buzón
+       (select count(*) - 1 from contactos c2
+          join prospecciones p2 on p2.negocio_id = c2.negocio_id
+         where lower(c2.email) = lower(ct.email) and p2.busqueda_id = b.id
+       )::text as hermanos
+     from prospecciones p
+       join busquedas b  on b.id = p.busqueda_id
+       join negocios  n  on n.id = p.negocio_id
+       join contactos ct on ct.negocio_id = n.id and ct.email is not null
+     where p.busqueda_id = $1
+       and p.estado in ('priorizado', 'contacto_encontrado')
+       and ct.estado_verificacion = 'verificado'
+     order by lower(ct.email), p.score desc nulls last
+     limit $2`,
+    [busquedaId, maximo],
+  );
+
+  const r: ResultadoGeneracion = {
+    candidatos: candidatos.length,
+    generados: 0,
+    omitidosPorBuzonCompartido: 0,
+    sinPersonalizador: 0,
+    costoUSD: 0,
+  };
+
+  for (const cand of candidatos) {
+    r.omitidosPorBuzonCompartido += Number(cand.hermanos);
+
+    const negocio: NegocioDescubierto = {
+      place_id: null,
+      nombre: cand.nombre,
+      nombre_normalizado: '',
+      dominio: null,
+      sitio_web: cand.sitio_web,
+      telefono: null,
+      direccion: cand.direccion,
+      categoria_google: cand.categoria_google,
+      rating: cand.rating === null ? null : Number(cand.rating),
+      num_resenas: cand.num_resenas,
+      estado_negocio: null,
+      url_maps: null,
+    };
+
+    // Sin dato personalizador no se redacta: un correo en frío genérico es spam.
+    if (elegirPersonalizador(negocio) === null) {
+      r.sinPersonalizador += 1;
+      continue;
+    }
+
+    const { borrador, modelo, costoUSD: costo } = await redactar({
+      negocio,
+      producto: cand.producto,
+      modelo: opciones.modelo,
+      generador: opciones.generador,
+    });
+
+    await guardarBorrador(cand.prospeccion_id, cand.contacto_id, borrador, modelo);
+    r.generados += 1;
+    r.costoUSD += costo;
+  }
+
+  // Las prospecciones cubiertas por el correo de un hermano: se anotan para que
+  // el operador entienda por qué no tienen borrador propio.
+  await poolPostgres().query(
+    `update prospecciones p
+     set razon = coalesce(p.razon, '') || ' · cubierta por el correo a un buzón compartido'
+     from contactos ct
+     where ct.negocio_id = p.negocio_id
+       and p.busqueda_id = $1
+       and p.estado = 'priorizado'
+       and exists (
+         select 1 from correos co
+           join contactos c2 on c2.id = co.contacto_id
+          where lower(c2.email) = lower(ct.email)
+       )
+       and p.razon not like '%buzón compartido%'`,
+    [busquedaId],
+  );
+
+  return r;
 }

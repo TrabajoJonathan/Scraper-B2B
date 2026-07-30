@@ -25,7 +25,37 @@ export function poolPostgres(): pg.Pool {
       // Supabase exige TLS y usa un CA propio.
       ssl: { rejectUnauthorized: false },
       max: 4,
-      idleTimeoutMillis: 10_000,
+      // Más corto que el timeout del pooler de Supabase: preferimos cerrar
+      // nosotros una conexión ociosa antes de que nos la cierren.
+      idleTimeoutMillis: 8_000,
+      keepAlive: true,
+
+      // ===================================================================
+      // Dos timeouts que convierten un cuelgue en un error legible
+      // ===================================================================
+      // Sin esto, una consulta que se traba o una transacción que quedó
+      // abierta dejan el proceso esperando para siempre — y en un cron eso
+      // significa un job zombi que nadie ve.
+      statement_timeout: 30_000,
+      idle_in_transaction_session_timeout: 20_000,
+    });
+
+    // ===================================================================
+    // OBLIGATORIO: pg.Pool emite 'error' y sin manejador Node MATA el proceso
+    // ===================================================================
+    // El pooler de Supabase cierra las conexiones ociosas por su cuenta. Cuando
+    // lo hace, el cliente ocioso del pool emite 'error'. Sin este manejador,
+    // Node lo trata como excepción no capturada y aborta.
+    //
+    // Lo encontró `npm run probar:fase5`: el proceso se cayó a mitad de la
+    // prueba con "Connection terminated unexpectedly". En el cron de la Fase 7,
+    // que va a tener el pool abierto entre corridas, habría sido una caída
+    // silenciosa cada tanto.
+    //
+    // No hay que reconectar a mano: el pool descarta ese cliente y crea otro en
+    // el próximo `connect()`. Solo hay que no morirse.
+    pool.on('error', (error) => {
+      console.error(`[postgres] conexión ociosa cerrada: ${error.message}`);
     });
   }
   return pool;
