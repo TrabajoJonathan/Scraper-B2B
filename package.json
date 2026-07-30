@@ -14,6 +14,7 @@
     "probar:fase1": "node --env-file=.env src/scripts/probar-fase1.ts",
     "probar:fase2": "node --env-file=.env src/scripts/probar-fase2.ts",
     "probar:fase3": "node --env-file=.env src/scripts/probar-fase3.ts",
+    "probar:fase4": "node --env-file=.env src/scripts/probar-fase4.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

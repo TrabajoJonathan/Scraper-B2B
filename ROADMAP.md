@@ -355,14 +355,59 @@ clientes reales. El estándar de la industria es rebote **< 2%**.
 
 ---
 
-### Fase 4 · Priorizar 📊
-Reglas baratas + Claude → ordenar por encaje. **NO descartar.**
-- [ ] Reglas (costo ~0): tiene web, rating alto, muchas reseñas, tiene email corporativo, ubicación correcta
-- [ ] Claude Haiku solo para los ambiguos: ¿este negocio compraría el producto?
-- [ ] Guardar **score + razón** (transparencia: "web profesional · +100 reseñas · email corporativo")
-- [ ] Ordenar por score; nadie se descarta, solo se ordena
+### Fase 4 · Priorizar 📊 🟢 *modular, lista y probada (29/29)*
 
-**Entregable:** Leads ordenados por prioridad con su razón. **Esfuerzo:** M · **Depende de:** Fase 3
+**Decidido con el jefe (29 jul):** se puntúa contra **el producto** que se va a ofrecer, con sus
+6 señales universales como base, y una web fea **sube** el score "porque tiene más necesidad".
+
+- [x] **Motor modular**: recibe `Regla[]` + pesos y produce el score. **No menciona ninguna señal.**
+      Hay una prueba que lo verifica leyendo el código fuente del motor.
+- [x] Cada señal es una regla **independiente y pura** (sin base de datos, sin red, sin reloj)
+- [x] Pesos en `scoring/configuracion.ts` — editar ahí no toca motor ni reglas. Peso 0 = apagada
+- [x] **Dos ejes**: `capacidad` (las 6 señales del jefe) y `necesidad` (la que confirmó)
+- [x] Guardar **score + razón + `score_detalle`** regla por regla (migración `011`)
+- [x] Filtro eliminatorio de contacto → score `null`, **no** 0 (y el negocio no se borra)
+- [x] Señales del HTML que ya descarga la Fase 2: pixels de publicidad, año de copyright, responsive
+- [x] **Probado: `npm run probar:fase4` → 29/29** ✅
+- [ ] Reemplazos pendientes: fecha de la última reseña (Places), antigüedad del dominio (RDAP)
+- [ ] Capa Claude para los ambiguos — *diferida:* con 9 reglas deterministas puede no hacer falta
+
+**Entregable:** Leads ordenados con su razón. **Esfuerzo:** M · **Estado:** 🟢 lista y probada.
+
+#### Las señales, y qué pasó con las del jefe
+
+| Señal que pidió | Peso | Qué se hizo |
+|---|---|---|
+| Inversión en ads (Meta Ad Library) | Alto | ✅ **Reemplazada:** pixel de Meta / tag de Google en su propia página. Mismo dato, público, gratis |
+| Actividad digital (IG/FB < 30 días) | Alto | ⚠️ **Reemplazo más flojo** (redes visibles + copyright al día) → por eso su peso **baja a Medio** |
+| Reseñas activas | Medio | ✅ El número ya sale de Places. La fecha de la última queda pendiente |
+| Tamaño (# empleados LinkedIn) | Medio | ✅ **Reemplazada por # sucursales**, que sale gratis de nuestros datos |
+| Antigüedad (registro del dominio) | Bajo-medio | 🟡 Regla escrita, RDAP pendiente. Devuelve *indeterminado*, no 0 |
+| Accesibilidad de contacto | Filtro | ✅ Es filtro eliminatorio, no puntúa — como pidió |
+
+Tres de sus señales requerían **scrapear Instagram, Facebook o LinkedIn** — el mismo riesgo de baneo
+que él mismo descartó. Se reemplazaron por evidencia que está en la página pública del negocio.
+
+#### Los dos ejes, y por qué la media geométrica
+
+Las 6 señales del jefe miden todas lo mismo: **si el negocio puede pagar**. Ninguna medía **si
+necesita el producto**. Él confirmó el eje que faltaba al responder que una web fea sube.
+
+Para vender sitios web los dos ejes están **negativamente correlacionados**: quien mantiene su sitio
+tiene capacidad pero no necesidad. Por eso se combinan con `√(capacidad × necesidad)` y no sumando —
+sumando, un negocio con plata y sitio impecable saldría alto, y ese no compra.
+
+**Medido en la prueba:** con el eje de necesidad, el 1º le saca **26 puntos** al 2º. Sin él, solo
+**3 puntos** — La Terraza se vería casi tan buena como El Fogón, y no lo es.
+
+> 🐛 **Bug de diseño que encontró la prueba:** la media geométrica pura **anula** el score si un eje
+> da 0 — tres leads quedaron en 0 exacto. Un 0 es un descarte disfrazado (nadie va a mirar un lead
+> en 0) y contradice "priorizar, no descartar"; además tres empatados en 0 no tienen orden entre sí.
+> Se agregó `PISO_EJE = 10`: ahora esos leads dan 25, 23 y 13 — muy por debajo del que sí necesita,
+> pero **ordenados y visibles**.
+>
+> 🐛 **Segundo bug:** el detector de "su sitio es un Linktree" tenía un regex roto que pedía
+> `linktr.ee.ee`. No habría marcado nunca ese caso. Se cambió por una lista explícita de dominios.
 
 ---
 
@@ -572,7 +617,9 @@ Ordenadas por qué tan pronto bloquean.
 | 2 | **¿Modo 1 usa el cerebro?** ¿La lista trae la categoría, o Claude la razona? | Dónde vive `cerebroService` | 🟠 antes de Fase 1 |
 | ~~3~~ | ~~Proyecto Supabase~~ | — | ✅ **resuelto** |
 | 4 | **Cuenta de Apify** + crédito | Fase 2 | 🟡 antes de Fase 2 |
-| 5 | **¿El scoring puntúa contra el producto de la lista, o contra las 4 líneas del pitch?** Son taxonomías distintas y cambian toda la Fase 4. La investigación de `04-scoring-encaje.md` asume las 4 líneas; el Modo 1 asume un producto. | Fase 4 | 🟡 antes de Fase 4 |
-| 6 | **¿Se le envía a los `catch_all`?** Hoy están excluidos (postura conservadora), pero en Panamá muchísimos dominios de PYME son catch-all, así que esto puede recortar buena parte de la lista útil. Alternativa: enviarles con cupo diario aparte y prioridad menor. | Fase 3 / la vista `v_correos_enviables` | 🟡 antes de Fase 3 |
+| ~~5~~ | ~~¿Scoring contra el producto o contra las 4 líneas?~~ | — | ✅ **Contra el producto** (29 jul) |
+| ~~6~~ | ~~¿Se le envía a los `catch_all`?~~ | — | ✅ **Se saltan** (29 jul). Ya era el default: cero código |
+| ~~9~~ | ~~¿Se contacta a quien ofuscó su email?~~ | — | ✅ **Sí se contacta** (29 jul). Ya era el default: cero código |
+| **10** | **Los pesos del eje NECESIDAD.** Dio los de capacidad como Alto/Medio/Bajo-medio; los de necesidad son propuesta nuestra y están marcados en `scoring/configuracion.ts` | Calibración de Fase 4 | 🟢 no bloquea |
 | 7 | **CRM:** vista sobre Supabase (gratis) vs externo (HubSpot) | Fase 6 | 🟢 antes de Fase 6 |
 | 8 | **Dominio de envío** dedicado + warm-up | B6 | 🟢 más adelante |

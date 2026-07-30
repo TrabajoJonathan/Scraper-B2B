@@ -28,28 +28,44 @@ import type { Traer } from '../servicios/contactoService.ts';
 
 const SITIOS: Record<string, Record<string, string>> = {
   // ---------------------------------------------------------------- caso 1
+  // Perfil de scoring: EL LEAD IDEAL 🎯
+  // Invierte en publicidad (pixel de Meta + tag de Google) y tiene 412 reseñas
+  // en Places -> CAPACIDAD alta. Pero su sitio no es responsive y el copyright
+  // dice 2018 -> NECESIDAD alta. Puede pagar Y necesita: debe salir primero.
   'elfogonpanameno.com.pa': {
     '/': `<!doctype html><html lang="es"><head>
       <title>El Fogón Panameño</title>
       <script>Sentry.init({dsn:"https://abc123@o45678.ingest.sentry.io/1234"})</script>
       <link rel="preload" href="/img/logo@2x.png">
+      <script>!function(f,b,e,v,n,t,s){fbq('init','123456789')}(window,document);</script>
+      <script src="https://connect.facebook.net/en_US/fbevents.js"></script>
+      <script src="https://www.googletagmanager.com/gtag/js?id=AW-111"></script>
       </head><body>
       <h1>Restaurante El Fogón Panameño</h1>
       <p>Cocina panameña desde 1998.</p>
+      <a href="https://instagram.com/elfogonpa">Instagram</a>
       <footer>
         <p>Calle 50, Bella Vista · Tel. 264-1234</p>
         <p>Escríbenos: info@elfogonpanameno.com.pa</p>
+        <p>&copy; 2018 El Fogón Panameño</p>
       </footer></body></html>`,
   },
 
   // ---------------------------------------------------------------- caso 2
+  // Perfil de scoring: PUEDE PAGAR PERO NO NECESITA
+  // 2 sucursales, tag de Google, sitio responsive y copyright al día. Tiene
+  // plata pero su web está bien -> no compra un sitio nuevo. Debe salir por
+  // debajo del Fogón, y con `suma` en vez de media geométrica saldría arriba.
   'laterraza.com.pa': {
     // El home no tiene email: solo redes y teléfono.
-    '/': `<!doctype html><html lang="es"><head><title>La Terraza</title></head><body>
+    '/': `<!doctype html><html lang="es"><head><title>La Terraza</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <script src="https://www.googletagmanager.com/gtag/js?id=G-222"></script>
+      </head><body>
       <h1>Cafetería La Terraza</h1>
       <nav><a href="/menu">Menú</a> <a href="/contacto">Contacto</a></nav>
       <p>Síguenos en <a href="https://instagram.com/laterrazapa">Instagram</a></p>
-      <footer>Tel. 223-5566</footer></body></html>`,
+      <footer>Tel. 223-5566 · &copy; 2026 La Terraza</footer></body></html>`,
     '/contacto': `<!doctype html><html lang="es"><head><title>Contacto</title></head><body>
       <h2>Contáctanos</h2>
       <p>Reservas: <a href="mailto:reservas@laterraza.com.pa">reservas@laterraza.com.pa</a></p>
@@ -58,11 +74,17 @@ const SITIOS: Record<string, Record<string, string>> = {
   },
 
   // ---------------------------------------------------------------- caso 3
+  // Perfil de scoring: FLOJO EN LOS DOS EJES
+  // Sin pixels, sin reseñas en Places (recién abierto), sitio responsive y al
+  // día. No tiene plata demostrable ni necesita sitio nuevo.
   'sushikobe.pa': {
-    '/': `<!doctype html><html lang="es"><head><title>Sushi Kobe</title></head><body>
+    '/': `<!doctype html><html lang="es"><head><title>Sushi Kobe</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      </head><body>
       <h1>Sushi Kobe</h1>
       <p>Pedidos y ventas: ventas (arroba) sushikobe.pa</p>
       <p>O al WhatsApp 6677-8899</p>
+      <footer>&copy; 2026 Sushi Kobe</footer>
       </body></html>`,
     '/contacto': `<!doctype html><html><body>
       <p>Gerencia: gerencia [at] sushikobe.pa</p>

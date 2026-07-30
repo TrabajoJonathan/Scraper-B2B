@@ -63,6 +63,13 @@ export type ContactoExtraido = {
   urlUsada: string | null;
   /** true si el sitio respondió pero no había email (≠ sitio caído). */
   sitioRespondio: boolean;
+  /**
+   * Señales para el scoring (Fase 4), del mismo HTML. null si el sitio no
+   * respondió: no sabemos, que es distinto de "no tiene pixel".
+   */
+  senalesWeb: SenalesWeb | null;
+  /** El "sitio" es una red social o Linktree. Se decide por el dominio. */
+  soloRedes: boolean;
 };
 
 /**
@@ -97,6 +104,106 @@ export function puntuarEmail(email: string, dominioNegocio: string | null): numb
   if (PROVEEDORES_GENERICOS.test(dominio)) puntos -= 40;
 
   return puntos;
+}
+
+/**
+ * Señales del sitio para el scoring (Fase 4).
+ *
+ * ===========================================================================
+ * Sale del MISMO HTML que ya descargamos para buscar el email.
+ * ===========================================================================
+ * Cero peticiones extra, cero costo, cero riesgo de ToS: es la página pública
+ * del propio negocio.
+ *
+ * Reemplaza dos señales que el jefe pidió pero que no se pueden obtener sin
+ * scrapear Instagram, Facebook o LinkedIn:
+ *
+ *   "inversión en ads (Meta Ad Library)" -> el pixel está en su propia página
+ *   "actividad digital reciente (IG/FB)" -> año del copyright + tiene redes
+ *
+ * Y de paso salen las señales del eje NECESIDAD (sitio viejo, no responsive),
+ * que era justo lo que le faltaba a su lista.
+ */
+export type SenalesWeb = {
+  tiene_pixel_meta: boolean;
+  tiene_tag_google: boolean;
+  /** Año más alto que aparece junto a un © o "copyright". */
+  anio_copyright: number | null;
+  es_responsive: boolean;
+  plataforma: string | null;
+};
+
+const RE_PIXEL_META = /fbq\s*\(|connect\.facebook\.net|fbevents\.js/i;
+const RE_TAG_GOOGLE = /gtag\s*\(|googletagmanager\.com|google-analytics\.com|googleadservices/i;
+const RE_VIEWPORT = /<meta[^>]+name\s*=\s*["']?viewport/i;
+/** © 2019 · &copy; 2019-2024 · Copyright 2019 */
+const RE_COPYRIGHT = /(?:©|&copy;|copyright)[^0-9]{0,20}((?:19|20)\d{2})/gi;
+
+const PLATAFORMAS: Array<[string, RegExp]> = [
+  ['wix', /wix\.com|wixstatic|_wixCssStates/i],
+  ['wordpress', /wp-content|wp-includes|wordpress/i],
+  ['shopify', /cdn\.shopify\.com|shopify\.js/i],
+  ['squarespace', /squarespace\.com|static1\.squarespace/i],
+  ['webflow', /webflow\.(com|js)|wf-/i],
+  ['godaddy', /godaddysites\.com|starfieldtech/i],
+];
+
+export function extraerSenalesWeb(html: string, anioActual: number): SenalesWeb {
+  // El copyright suele repetirse (footer, meta, scripts). Tomamos el AÑO MÁS
+  // ALTO: si el footer dice 2019 pero un script dice 2025, el sitio se tocó
+  // en 2025. Ser conservador acá evita marcar como abandonado un sitio vivo.
+  let anio: number | null = null;
+  for (const m of html.matchAll(RE_COPYRIGHT)) {
+    const y = Number(m[1]);
+    // Descarta años imposibles (fechas de librerías, números sueltos).
+    if (y >= 2000 && y <= anioActual + 1 && (anio === null || y > anio)) anio = y;
+  }
+
+  const plataforma = PLATAFORMAS.find(([, re]) => re.test(html))?.[0] ?? null;
+
+  return {
+    tiene_pixel_meta: RE_PIXEL_META.test(html),
+    tiene_tag_google: RE_TAG_GOOGLE.test(html),
+    anio_copyright: anio,
+    es_responsive: RE_VIEWPORT.test(html),
+    plataforma,
+  };
+}
+
+/**
+ * ¿El "sitio web" es en realidad una red social o un Linktree?
+ *
+ * Se decide por el DOMINIO, no por el HTML: si su ficha de Places apunta a
+ * instagram.com/elnegocio, no tienen sitio — tienen un perfil. Señal fuerte del
+ * eje NECESIDAD.
+ */
+/**
+ * Lista de dominios completos, no un patrón con sufijos.
+ *
+ * El primer intento fue un regex con grupo de sufijos, y `linktr.ee` nunca
+ * coincidía: pedía "linktr.ee" y ADEMÁS un sufijo, o sea `linktr.ee.ee`. Lo
+ * encontró la prueba. Una lista explícita es más aburrida y no se equivoca.
+ */
+const DOMINIOS_NO_SITIO = new Set([
+  'instagram.com',
+  'facebook.com',
+  'fb.com',
+  'm.me',
+  'linktr.ee',
+  'linktree.com',
+  'beacons.ai',
+  'bio.link',
+  'wa.me',
+  'api.whatsapp.com',
+  'twitter.com',
+  'x.com',
+  'tiktok.com',
+  'sites.google.com',
+]);
+
+export function esSoloRedes(dominio: string | null): boolean {
+  if (dominio === null) return false;
+  return DOMINIOS_NO_SITIO.has(dominio.replace(/^www\./, '').toLowerCase());
 }
 
 function extraerRedes(html: string): Record<string, string> | null {
@@ -137,9 +244,11 @@ async function traerConFetch(url: string): Promise<string | null> {
 export async function extraerContacto(
   sitioWeb: string | null,
   dominioNegocio: string | null,
-  opciones: { traer?: Traer } = {},
+  opciones: { traer?: Traer; anioActual?: number } = {},
 ): Promise<ContactoExtraido> {
   const traer = opciones.traer ?? traerConFetch;
+  // El año se inyecta para que la extracción sea determinista y probable.
+  const anioActual = opciones.anioActual ?? new Date().getFullYear();
   const vacio: ContactoExtraido = {
     email: null,
     origen: null,
@@ -148,6 +257,8 @@ export async function extraerContacto(
     redes: null,
     urlUsada: null,
     sitioRespondio: false,
+    senalesWeb: null,
+    soloRedes: esSoloRedes(dominioNegocio),
   };
 
   if (sitioWeb === null || sitioWeb.trim() === '') return vacio;
@@ -161,6 +272,7 @@ export async function extraerContacto(
 
   let sitioRespondio = false;
   let redes: Record<string, string> | null = null;
+  let senalesWeb: SenalesWeb | null = null;
 
   for (const ruta of RUTAS) {
     const url = new URL(ruta, base).toString();
@@ -170,6 +282,9 @@ export async function extraerContacto(
     sitioRespondio = true;
     // Las redes se acumulan de cualquier página que responda.
     redes = redes ?? extraerRedes(htmlCrudo);
+    // Las señales se toman de la PRIMERA página que responda (el home casi
+    // siempre): es donde viven los pixels y el footer con el copyright.
+    senalesWeb = senalesWeb ?? extraerSenalesWeb(htmlCrudo, anioActual);
 
     const html = desofuscar(htmlCrudo);
     const eraOfuscado = html !== htmlCrudo;
@@ -201,8 +316,10 @@ export async function extraerContacto(
       redes,
       urlUsada: url,
       sitioRespondio,
+      senalesWeb,
+      soloRedes: vacio.soloRedes,
     };
   }
 
-  return { ...vacio, redes, sitioRespondio };
+  return { ...vacio, redes, sitioRespondio, senalesWeb };
 }
