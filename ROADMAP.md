@@ -465,14 +465,57 @@ leads antes de enviar. **El control humano vive aquí.**
 - [x] Columnas de auditoría (`aprobado_por`, `aprobado_en`, `editado_por`) — migración `012`
 - [x] **Tabla `corridas`** (migración `013`) + pantalla de progreso por pasos
 - [x] `npm run sembrar` — datos de demo para ver el panel sin ninguna credencial
-- [ ] **Supabase Auth + políticas RLS** — hoy RLS está activo *sin políticas*, o sea la llave pública
-      está bloqueada (default seguro). Escribir esas políticas es trabajo real de esta fase
-- [ ] El cron que avance las corridas (es la Fase 7)
-- [ ] Paralelizar la descarga de sitios (hoy el bucle es en serie)
+- [x] **Supabase Auth** — login, `middleware.ts` como guard, restricción por dominio, botón de salir
+- [x] **Políticas RLS** (migración `015`) — como **segunda** capa; ver la advertencia abajo
+- [x] La auditoría usa el **usuario real**: el FK de `correos.aprobado_por` a `auth.users` por fin sirve
+- [x] El cron que avanza las corridas (Fase 7)
+- [x] Paralelizar la descarga de sitios (6 concurrentes, en el paso de contacto)
+- [ ] Crear las cuentas de los empleados en el panel de Supabase
+- [ ] Apagar el registro público en Supabase (o poner `DOMINIO_PERMITIDO`)
 
 **Entregable:** Los empleados ven todo y aprueban. **Esfuerzo:** L
-**Estado:** 🟢 **estructura completa y funcionando contra la base real.** Falta autenticación y
-que el cron mueva las corridas.
+**Estado:** 🟢 **completa y con autenticación.** Falta crear las cuentas de los empleados.
+
+> ## ⚠️ Dónde está la seguridad de verdad
+>
+> Esto hay que entenderlo antes de confiar en el sistema.
+>
+> **La seguridad real es `middleware.ts`.** Sin sesión no se llega a ninguna ruta, y por lo tanto no
+> se ejecuta ninguna consulta. Verificado: las 5 rutas del panel redirigen a `/login` con 307, y
+> `volver=` recuerda a dónde iba.
+>
+> **Las políticas RLS son la SEGUNDA capa, y hoy no están conteniendo al panel.** El panel consulta
+> Postgres directo (`core/postgres.ts`, con la contraseña de la base) y eso **salta RLS por completo**.
+> Las políticas existen para el día que algo use la llave pública desde el navegador — un gráfico en
+> vivo, una app móvil, un componente de cliente. Sin ellas, RLS activo bloquea todo (seguro pero
+> inservible); con ellas, un autenticado lee y un anónimo no puede nada.
+>
+> **Lo que NO hay que creer:** que RLS está protegiendo el panel. Si algún día se quiere que sea la
+> única frontera, hay que migrar las consultas de `pg` al cliente de Supabase con el token del
+> usuario. Es un trabajo aparte y no está hecho.
+>
+> ### Decisiones de la autenticación
+>
+> **`getUser()` y no `getSession()`.** `getSession()` lee la cookie sin validarla contra el servidor,
+> así que una cookie manipulada pasaría. `getUser()` verifica el token con Supabase. Es más lento y
+> es el correcto.
+>
+> **Se usa la llave pública, no la de servidor.** La `sb_secret_` salta RLS y puede todo: si se usara
+> para autenticar, un token falso daría acceso total. La pública solo puede lo que el usuario puede.
+>
+> **No hay registro público.** Es una herramienta interna: las cuentas se crean desde el panel de
+> Supabase. Y hay una segunda capa en el código (`DOMINIO_PERMITIDO`) para que, aunque el registro
+> quedara abierto por error, un correo de afuera no entre.
+>
+> **El mensaje de error no distingue "no existe la cuenta" de "contraseña incorrecta".** Distinguirlos
+> le confirmaría a un desconocido qué correos son empleados de la empresa.
+>
+> **El email del empleado se muestra en la navegación.** No es decorativo: las aprobaciones se
+> registran a su nombre. Si alguien deja la sesión abierta en una máquina compartida y otro aprueba,
+> la auditoría va a decir el nombre equivocado — verlo siempre visible es lo que hace que se note.
+>
+> **Se eliminó el suplente de autenticación** (`app/lib/usuario.ts`) y con él el banner de aviso. Ya
+> no hace falta: hay identidades reales.
 
 #### Rutas
 

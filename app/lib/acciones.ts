@@ -17,9 +17,55 @@ import { redirect } from 'next/navigation';
 import { crearCorrida } from '../../src/servicios/corridaService.ts';
 import { aprobar, editar, descartar } from '../../src/servicios/revisionService.ts';
 import { CANALES, type Canal } from '../../src/dominio/tipos.ts';
-import { usuarioActual } from './usuario.ts';
+import {
+  clienteConSesion,
+  dominioPermitido,
+  usuarioParaAuditoria,
+} from './sesion.ts';
 
 export type EstadoAccion = { ok: boolean; mensaje?: string };
+
+// ---------------------------------------------------------------------------
+// Sesión
+// ---------------------------------------------------------------------------
+
+export async function accionEntrar(
+  _previo: EstadoAccion | null,
+  datos: FormData,
+): Promise<EstadoAccion> {
+  const email = String(datos.get('email') ?? '').trim();
+  const password = String(datos.get('password') ?? '');
+  const volver = String(datos.get('volver') ?? '/');
+
+  if (email === '' || password === '') {
+    return { ok: false, mensaje: 'Faltan el correo o la contraseña.' };
+  }
+
+  // Se revisa el dominio ANTES de autenticar: si la cuenta no debería existir,
+  // no hace falta ni consultar si la contraseña es correcta.
+  if (!dominioPermitido(email)) {
+    return { ok: false, mensaje: 'Ese correo no tiene acceso a esta herramienta.' };
+  }
+
+  const supabase = await clienteConSesion();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+  if (error !== null) {
+    // Mensaje genérico a propósito: distinguir "no existe la cuenta" de
+    // "contraseña incorrecta" le confirmaría a un desconocido qué correos son
+    // empleados de la empresa.
+    return { ok: false, mensaje: 'Correo o contraseña incorrectos.' };
+  }
+
+  // Solo rutas internas: un `volver` con URL externa sería un redirect abierto.
+  redirect(volver.startsWith('/') ? volver : '/');
+}
+
+export async function accionSalir(): Promise<void> {
+  const supabase = await clienteConSesion();
+  await supabase.auth.signOut();
+  redirect('/login');
+}
 
 /**
  * Encarga una corrida. NO la ejecuta.
@@ -46,7 +92,7 @@ export async function accionCrearCorrida(
 
   const { corridaId } = await crearCorrida(
     { producto, categoria, ubicacion, canal: canalCrudo as Canal },
-    usuarioActual().email,
+    (await usuarioParaAuditoria()).email,
   );
 
   redirect(`/corridas/${corridaId}`);
@@ -54,7 +100,7 @@ export async function accionCrearCorrida(
 
 export async function accionAprobar(datos: FormData): Promise<void> {
   const correoId = String(datos.get('correoId') ?? '');
-  const r = await aprobar(correoId, usuarioActual());
+  const r = await aprobar(correoId, await usuarioParaAuditoria());
   // No lanzamos si falla: que un correo no sea aprobable es parte del flujo
   // normal (opt-out posterior, email sin verificar). La pantalla lo muestra.
   if (!r.ok) {
@@ -66,7 +112,7 @@ export async function accionAprobar(datos: FormData): Promise<void> {
 export async function accionDescartar(datos: FormData): Promise<void> {
   const correoId = String(datos.get('correoId') ?? '');
   const motivo = String(datos.get('motivo') ?? '').trim();
-  await descartar(correoId, usuarioActual(), motivo === '' ? undefined : motivo);
+  await descartar(correoId, await usuarioParaAuditoria(), motivo === '' ? undefined : motivo);
   revalidatePath('/revision');
 }
 
@@ -80,7 +126,7 @@ export async function accionEditar(datos: FormData): Promise<void> {
       ...(asunto === '' ? {} : { asunto }),
       ...(cuerpo === '' ? {} : { cuerpo }),
     },
-    usuarioActual(),
+    await usuarioParaAuditoria(),
   );
   revalidatePath('/revision');
 }

@@ -10,7 +10,13 @@ const ENLACES = [
   { href: '/revision', texto: 'Revisión' },
 ] as const;
 
-export function Nav() {
+type Props = {
+  emailEmpleado: string;
+  /** La Server Action de salir, pasada desde el layout. */
+  accionSalir: () => Promise<void>;
+};
+
+export function Nav({ emailEmpleado, accionSalir }: Props) {
   const ruta = usePathname();
 
   return (
@@ -30,10 +36,31 @@ export function Nav() {
           {e.texto}
         </Link>
       ))}
+
       <div className="nav__pie">
-        Alcance v1: Modo 1 sobre Google Maps.
-        <br />
-        El envío nunca es automático.
+        {/*
+          Se muestra quién está logueado porque las aprobaciones se registran a su
+          nombre. Si alguien deja la sesión abierta en una máquina compartida y
+          otro aprueba, la auditoría va a decir el nombre equivocado — y verlo
+          arriba a la izquierda es lo que hace que se note.
+        */}
+        <div className="mono" style={{ marginBottom: '.5rem', wordBreak: 'break-all' }}>
+          {emailEmpleado}
+        </div>
+        <form action={accionSalir}>
+          <button
+            type="submit"
+            className="secundario"
+            style={{ fontSize: '.75rem', padding: '.25rem .6rem' }}
+          >
+            Salir
+          </button>
+        </form>
+        <div style={{ marginTop: '.75rem' }}>
+          Alcance v1: Modo 1 sobre Google Maps.
+          <br />
+          El envío nunca es automático.
+        </div>
       </div>
     </nav>
   );

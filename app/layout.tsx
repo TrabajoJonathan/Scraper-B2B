@@ -1,36 +1,32 @@
 import './globals.css';
 import { Nav } from './componentes/Nav.tsx';
-import { usuarioActual } from './lib/usuario.ts';
+import { empleadoActual } from './lib/sesion.ts';
+import { accionSalir } from './lib/acciones.ts';
 
 export const metadata = {
-  title: 'Prospección · Codeflow',
-  description: 'Herramienta interna de prospección de clientes B2B',
+  title: 'Prospección · herramienta interna',
+  description: 'Prospección de clientes B2B',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const usuario = usuarioActual();
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const empleado = await empleadoActual();
+
+  // Sin sesión el layout no dibuja el panel: quien está acá es alguien en /login,
+  // y no tiene permiso de ver ni la navegación ni los contadores.
+  if (empleado === null) {
+    return (
+      <html lang="es">
+        <body>{children}</body>
+      </html>
+    );
+  }
 
   return (
     <html lang="es">
       <body>
         <div className="shell">
-          <Nav />
-          <main className="contenido">
-            {/*
-              El suplente de autenticación se muestra a propósito. Un registro de
-              auditoría con una identidad falsa escondida es peor que no tenerlo:
-              alguien lo va a leer en seis meses creyendo que es real.
-            */}
-            {usuario.esSuplente && (
-              <div className="aviso">
-                <strong>Sin autenticación.</strong> Estás actuando como{' '}
-                <span className="mono">{usuario.email}</span>. Las aprobaciones se van a
-                registrar con ese identificador, que <strong>no es una persona real</strong>.
-                Se reemplaza al conectar Supabase Auth.
-              </div>
-            )}
-            {children}
-          </main>
+          <Nav emailEmpleado={empleado.email} accionSalir={accionSalir} />
+          <main className="contenido">{children}</main>
         </div>
       </body>
     </html>
