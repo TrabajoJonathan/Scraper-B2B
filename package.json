@@ -20,7 +20,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.scripts.json --noEmit",
-    "sembrar": "node --env-file=.env src/scripts/sembrar-demo.ts"
+    "sembrar": "node --env-file=.env src/scripts/sembrar-demo.ts",
+    "cron": "node --env-file=.env src/scripts/cron-local.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

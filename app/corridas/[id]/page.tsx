@@ -39,6 +39,19 @@ export default async function DetalleCorrida({
         {' · '}<EstadoCorridaPildora estado={corrida.estado} />
       </p>
 
+      {/*
+        Mismo criterio que con el suplente de autenticación: si el sistema opera
+        con datos falsos, tiene que decirlo. Un lead inventado se ve idéntico a
+        uno real, y dentro de un mes nadie se va a acordar de cuál era cuál.
+      */}
+      {corrida.con_fixtures && (
+        <div className="aviso">
+          <strong>Datos sintéticos.</strong> Esta corrida usó negocios inventados porque
+          faltan credenciales de las APIs. Los leads que salgan de acá{' '}
+          <strong>no son negocios reales de Panamá</strong>.
+        </div>
+      )}
+
       {corrida.error !== null && (
         <div className="aviso" style={{ borderColor: 'var(--riesgo)', color: '#fbd2d2' }}>
           <strong>Falló:</strong> <span className="mono">{corrida.error}</span>
@@ -71,12 +84,12 @@ export default async function DetalleCorrida({
 
       {enCurso && (
         <div className="aviso">
-          El trabajo lo hace el cron en segundo plano, un paso por vez. Esta página se
-          actualiza sola cada 5 segundos.
+          El trabajo lo hace el cron en segundo plano, <strong>un paso por vez</strong>. Esta
+          página se actualiza sola cada 5 segundos.
           <br />
           <span className="apagado">
-            El cron todavía no está construido (Fase 7), así que la corrida va a quedarse
-            en «en cola» hasta entonces.
+            En local el cron se levanta con <span className="mono">npm run cron</span>. En
+            Vercel corre solo cada minuto.
           </span>
         </div>
       )}

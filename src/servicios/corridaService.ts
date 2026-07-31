@@ -34,6 +34,11 @@ export type Corrida = {
   progreso_hecho: number;
   progreso_total: number | null;
   error: string | null;
+  /**
+   * true = corrió con datos SINTÉTICOS por falta de credenciales.
+   * Sus leads no son negocios reales. La interfaz lo avisa.
+   */
+  con_fixtures: boolean;
   creada_por_email: string | null;
   creada_en: string;
   iniciada_en: string | null;

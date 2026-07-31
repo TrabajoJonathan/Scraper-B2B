@@ -42,6 +42,17 @@ export default async function Corridas() {
                 <td className="apagado">{c.categoria} · {c.ubicacion}</td>
                 <td>
                   <EstadoCorridaPildora estado={c.estado} />
+                  {c.con_fixtures && (
+                    <>
+                      {' '}
+                      <span
+                        className="pildora pildora--alerta"
+                        title="Corrió con negocios inventados: faltaban credenciales"
+                      >
+                        datos de prueba
+                      </span>
+                    </>
+                  )}
                   {c.error !== null && (
                     <span className="razon" title={c.error}>
                       {c.error.slice(0, 60)}

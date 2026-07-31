@@ -556,14 +556,47 @@ puede mostrar —ni dejar aprobar— algo que no debe enviarse.
 
 ---
 
-### Fase 7 · Automatizar ⏰
-Cron diario **incremental** (para aislar errores).
-- [ ] Paso 1: cron solo de **descubrimiento**
-- [ ] Paso 2: + **contacto**
-- [ ] Paso 3: + **verificación + priorización + redacción**
-- [ ] El humano sigue revisando en el panel; **el envío nunca se automatiza**
+### Fase 7 · Automatizar ⏰ 🟢 *funcionando de punta a punta*
+Cron que avanza las corridas **un paso por invocación**.
+- [x] `ejecutarPaso()` — un paso por llamada, para caber en el límite de Vercel
+- [x] El paso de contacto va **por lotes** (12 sitios) con **concurrencia** (6 en paralelo)
+- [x] Ruta `/api/cron` protegida con `CRON_SECRET`, **falla cerrado** si falta
+- [x] `vercel.json` con el cron cada minuto
+- [x] `npm run cron` — runner local con intervalo de 2s, para la demo
+- [x] Elige APIs reales o fixtures **según haya credenciales**, y marca la corrida
+- [x] Un fallo deja la corrida en `fallida` con el mensaje **visible en la interfaz**
+- [x] El humano sigue revisando en el panel; **el envío nunca se automatiza**
 
-**Entregable:** Corre solo cada día (pasos 1–5); el humano aprueba. **Esfuerzo:** M · **Depende de:** Fase 6
+**Entregable:** Las corridas avanzan solas; el humano aprueba. **Esfuerzo:** M
+**Estado:** 🟢 **probado de punta a punta.** Una corrida encargada llegó sola de
+`descubrir` a `listo`:
+
+```
+→ descubrir  7 negocios · 7 nuevos · 1 cerrados
+→ contacto   5 sitios revisados · 4 con correo · quedan 0
+→ contacto   contacto terminado · 1 sin web marcados
+→ verificar  3 llamadas · 4 filas · 1 ahorradas · $0.0111
+→ priorizar  4 con score · promedio 28 · 2 sin canal
+✓ redactar   2 borradores · 1 omitidos por buzón compartido · $0.0076
+```
+
+> **Por qué un paso por invocación y no el pipeline entero.** Una función de Vercel se corta en
+> decenas de segundos; bajar 60 sitios tarda minutos. El cron toma una corrida, le da **un** paso y
+> devuelve el control. Cuando el paso es largo (contacto), procesa un lote y devuelve el **mismo**
+> paso: el cron vuelve. Así 200 negocios se procesan sin que ninguna invocación se pase del límite.
+>
+> **`for update skip locked`** en `tomarSiguienteCorrida()`: si dos invocaciones se solapan, la
+> segunda **salta** la corrida que la primera ya tomó en vez de esperarla. Sin eso, dos crons harían
+> el mismo trabajo dos veces o se bloquearían.
+>
+> 🔒 **La ruta del cron falla cerrado.** Dispara trabajo que cuesta plata, así que sin `CRON_SECRET`
+> en producción responde 500 y no corre nada — antes que quedar abierta. Verificado: 401 sin token,
+> 401 con token malo, 200 con el correcto.
+>
+> ⚠️ **Marca las corridas que usan datos sintéticos** (migración `014`, `con_fixtures`). Mismo
+> criterio que con el suplente de autenticación: un lead inventado se ve **idéntico** a uno real, y
+> dentro de un mes nadie se acordaría de cuál era cuál. La interfaz lo avisa con una píldora en la
+> lista y un banner en el detalle.
 
 ---
 
