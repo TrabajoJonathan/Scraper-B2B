@@ -6,3 +6,9 @@ node_modules/
 # Se revisan a mano, no se versionan.
 salidas/
 *.log
+
+# Next.js
+.next/
+next-env.d.ts
+tsconfig.tsbuildinfo
+*.tsbuildinfo

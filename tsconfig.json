@@ -1,25 +1,61 @@
 {
+  // ==========================================================================
+  // Configuración de la APP (Next.js). Para los scripts: tsconfig.scripts.json
+  // ==========================================================================
+  //
+  // Hacen falta dos configs porque hay dos runtimes con reglas incompatibles:
+  //
+  //   Next.js  -> moduleResolution "bundler": es el bundler quien resuelve.
+  //   Node 24  -> moduleResolution "nodenext": Node exige rutas y extensiones
+  //               reales, y `erasableSyntaxOnly` para que pueda borrar los tipos.
+  //
+  // Con solo "nodenext", TypeScript no resuelve `next/link` ni `next/navigation`
+  // (por cómo Next declara sus `exports`), y en cascada se pierde el narrowing de
+  // `notFound()` y `redirect()`, que devuelven `never`.
+  //
+  // `npm run typecheck` corre las dos.
   "compilerOptions": {
-    "target": "es2024",
-    "lib": ["es2024"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "types": ["node"],
-
-    // Node 24 ejecuta .ts directamente borrando los tipos (type stripping).
-    // No compilamos: tsc solo revisa tipos. De ahi estas tres opciones.
-    "noEmit": true,
+    "target": "ES2022",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "ES2022"
+    ],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    // Los servicios de src/ importan con extensión .ts porque Node lo exige.
+    // El bundler de Next las resuelve igual (verificado con `next build`).
     "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    // Falla si escribimos sintaxis que Node NO puede borrar (enum, namespace,
-    // decoradores). Nos obliga a quedarnos en el subconjunto que corre nativo.
-    "erasableSyntaxOnly": true,
-
+    "noEmit": true,
+    "allowJs": true,
+    "incremental": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noFallthroughCasesInSwitch": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
-  "include": ["src/**/*.ts"]
+  // Incluye src/ además de app/: la app importa los servicios y hay que
+  // verificar esos tipos en el contexto de la app también.
+  "include": [
+    "next-env.d.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "src/**/*.ts",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next"
+  ]
 }

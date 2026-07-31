@@ -458,17 +458,61 @@ Claude Haiku → primer correo por lead, y el flujo de revisión humana.
 ### Fase 6 · Panel + revisión 👀
 Aplicación web interna en **Vercel** donde los empleados buscan, revisan, priorizan y aprueban
 leads antes de enviar. **El control humano vive aquí.**
-- [ ] Panel: listar leads con filtros (categoría, ubicación, con/sin email, estado) y orden por score
-- [ ] Vista de revisión del correo: aprobar / editar / descartar antes de enviar
-- [ ] Contadores mínimos (leads, con email, pendientes, aprobados) — *sin dashboard pesado*
-- [ ] Estados `aprobado` / `descartado_por_humano`
-- [x] Columnas de auditoría (`aprobado_por`, `aprobado_en`, `editado_por`) — migración `012`, hecha antes a propósito
+- [x] **Andamiaje Next.js 16** en el mismo repo · `npm run dev` · build de producción verificado
+- [x] Panel: listar leads con filtros (texto, estado, con/sin email) y orden por score
+- [x] Vista de revisión: aprobar / editar / descartar, con el aviso de buzón compartido
+- [x] Contadores del tablero (6, en una sola consulta) — *sin dashboard pesado*
+- [x] Columnas de auditoría (`aprobado_por`, `aprobado_en`, `editado_por`) — migración `012`
+- [x] **Tabla `corridas`** (migración `013`) + pantalla de progreso por pasos
+- [x] `npm run sembrar` — datos de demo para ver el panel sin ninguna credencial
 - [ ] **Supabase Auth + políticas RLS** — hoy RLS está activo *sin políticas*, o sea la llave pública
       está bloqueada (default seguro). Escribir esas políticas es trabajo real de esta fase
-- [ ] **Tabla `corridas` + progreso asíncrono** — ver la restricción de abajo
+- [ ] El cron que avance las corridas (es la Fase 7)
 - [ ] Paralelizar la descarga de sitios (hoy el bucle es en serie)
 
-**Entregable:** Los empleados ven todo y aprueban. **Esfuerzo:** L · **Depende de:** Fase 5
+**Entregable:** Los empleados ven todo y aprueban. **Esfuerzo:** L
+**Estado:** 🟢 **estructura completa y funcionando contra la base real.** Falta autenticación y
+que el cron mueva las corridas.
+
+#### Rutas
+
+| Ruta | Qué es |
+|---|---|
+| `/` | Tablero: 6 contadores, leads por estado, últimas corridas |
+| `/corridas` | Lista de corridas con estado, paso y progreso |
+| `/corridas/nueva` | Formulario que **encarga** la búsqueda |
+| `/corridas/[id]` | Progreso por pasos, con recarga automática cada 5s mientras corre |
+| `/leads` | Tabla ordenada por score, con filtros **en la URL** (el enlace se comparte) |
+| `/revision` | La cola de borradores: aprobar / editar / descartar |
+
+#### Decisiones del andamiaje
+
+**Next.js en el mismo repo, no aparte.** Así las Server Actions importan los servicios de
+`src/` directamente. La app resultó **andamiaje y no reescritura** — que es la prueba de que la
+regla de dependencia sirvió: los servicios ya estaban escritos para ser llamados desde cualquier
+lado, y los scripts de prueba eran solo el primer llamador.
+
+**Dos `tsconfig`, uno por runtime.** La app necesita `moduleResolution: bundler`; los scripts
+necesitan `nodenext` + `erasableSyntaxOnly` para que Node ejecute los `.ts`. Con solo `nodenext`,
+TS no resuelve `next/link` y en cascada se pierde el narrowing de `notFound()`. `npm run typecheck`
+corre las dos; si algo choca, **manda la de scripts** (el pipeline corre sobre Node).
+
+**El suplente de autenticación se MUESTRA en la interfaz.** `aprobar()` exige un email para la
+auditoría, y sin login hay que poner algo. La alternativa era un `'sistema@local'` silencioso, y eso
+es **peor que no tener auditoría**: un registro que dice quién aprobó pero miente es una trampa para
+quien lo lea en seis meses. Mostrándolo, nadie confunde estos registros con los de producción.
+
+**Los filtros de `/leads` viven en la URL.** Un empleado le puede mandar a otro el enlace de "los
+leads sin correo de esta búsqueda" y ve exactamente lo mismo. Con estado en React eso no se comparte,
+y además haría falta JavaScript para algo que un `<form>` GET ya hace.
+
+**La revisión lee solo de `v_correos_enviables`.** Nunca de las tablas directo. Así la pantalla no
+puede mostrar —ni dejar aprobar— algo que no debe enviarse.
+
+> 🐛 **Bug que apareció al probar el panel con datos:** una corrida completada mostraba la barra al
+> **71%**, porque `terminarCorrida` marcaba el estado pero no igualaba `progreso_hecho` al total. Un
+> empleado habría visto una corrida "lista" con la barra a medias y habría pensado que quedó colgada.
+> Corregido en el mismo `update`.
 
 > ## ⚠️ El pipeline NO cabe en una petición de Vercel
 >

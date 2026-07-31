@@ -1,0 +1,37 @@
+{
+  // ==========================================================================
+  // Configuración de los SCRIPTS y SERVICIOS (Node 24 nativo).
+  // Para la app web: tsconfig.json
+  // ==========================================================================
+  //
+  // Esta es la config ESTRICTA, y la que manda sobre src/. Node ejecuta los .ts
+  // directamente borrando los tipos, así que hay reglas que la app no necesita
+  // pero acá son obligatorias:
+  //
+  //   nodenext            -> Node resuelve, no un bundler: rutas y extensiones reales
+  //   erasableSyntaxOnly  -> falla si escribimos algo que Node NO puede borrar
+  //                          (enum, namespace, decoradores)
+  //   verbatimModuleSyntax-> obliga `import type` donde corresponde
+  //
+  // Si algo pasa la config de la app pero falla acá, gana esta: el pipeline y el
+  // cron corren sobre Node, no sobre el bundler.
+  "compilerOptions": {
+    "target": "es2024",
+    "lib": ["es2024"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*.ts"]
+}

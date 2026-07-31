@@ -16,16 +16,25 @@
     "probar:fase3": "node --env-file=.env src/scripts/probar-fase3.ts",
     "probar:fase4": "node --env-file=.env src/scripts/probar-fase4.ts",
     "probar:fase5": "node --env-file=.env src/scripts/probar-fase5.ts",
-    "typecheck": "tsc --noEmit"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.scripts.json --noEmit",
+    "sembrar": "node --env-file=.env src/scripts/sembrar-demo.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
     "@supabase/supabase-js": "^2.58.0",
-    "pg": "^8.16.0"
+    "next": "^16.2.12",
+    "pg": "^8.16.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/pg": "^8.15.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "typescript": "^5.9.0"
   }
 }
