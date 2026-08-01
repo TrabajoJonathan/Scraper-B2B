@@ -1,6 +1,10 @@
 node_modules/
-.env
-.env.local
+
+# Cualquier .env queda fuera, salvo la plantilla. El patron es con comodin a
+# proposito: `.env` y `.env.local` sueltos dejaban pasar un `.env.vercel` o un
+# `.env.produccion` creado despues, que es exactamente donde viven los secretos.
+.env*
+!.env.example
 
 # Salidas del spike de Places: contienen datos crudos de negocios reales.
 # Se revisan a mano, no se versionan.
