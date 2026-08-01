@@ -1,6 +1,7 @@
 import { poolPostgres } from '../../src/core/postgres.ts';
 import { colaDeRevision } from '../../src/servicios/revisionService.ts';
-import { TarjetaBorrador } from './TarjetaBorrador.tsx';
+import { ListaBorradores } from './ListaBorradores.tsx';
+import { PanelBorrador } from './PanelBorrador.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,18 @@ export default async function Revision({
 
   const cola = busquedaId === undefined ? [] : await colaDeRevision(busquedaId);
 
+  /*
+   * Cuál borrador se muestra a la derecha.
+   *
+   * El `?? cola[0]` no es un detalle: después de aprobar, la acción hace
+   * `revalidatePath('/revision')` pero la URL se queda con el `?correo=` del que
+   * acabás de aprobar — y ese ya salió de la cola. Al no encontrarlo, cae al
+   * primero, así que aprobar avanza solo al siguiente. Es el mismo
+   * comportamiento de una bandeja de entrada, y sale de una línea.
+   */
+  const pedido = sp['correo'];
+  const elegido = cola.find((c) => c.correoId === pedido) ?? cola[0];
+
   return (
     <>
       <h1>Revisión</h1>
@@ -47,22 +60,27 @@ export default async function Revision({
         que lo dejemos de contactar.
       </p>
 
-      {cola.length === 0 ? (
+      {elegido === undefined ? (
         <p className="tabla__vacia">
           No hay borradores por revisar.
           <br />
-          <span className="apagado">
-            Aparecen acá cuando una corrida llega al paso de redacción.
-          </span>
+          Aparecen acá cuando una corrida llega al paso de redacción.
         </p>
       ) : (
         <>
-          <p className="apagado mono" style={{ marginBottom: '1rem' }}>
+          <p className="tenue" style={{ fontSize: 'var(--t-label)', margin: '0 0 var(--e3)' }}>
             {cola.length} por revisar · ordenados por score
           </p>
-          {cola.map((c) => (
-            <TarjetaBorrador key={c.correoId} borrador={c} />
-          ))}
+
+          <div className="revision">
+            <ListaBorradores
+              items={cola}
+              seleccionado={elegido.correoId}
+              busquedaId={busquedaId}
+            />
+            {/* `key` remonta el panel al cambiar de borrador: ver el comentario allá. */}
+            <PanelBorrador key={elegido.correoId} borrador={elegido} />
+          </div>
         </>
       )}
     </>

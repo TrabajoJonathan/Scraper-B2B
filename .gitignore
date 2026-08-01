@@ -17,3 +17,7 @@ tsconfig.tsbuildinfo
 client_secret_*.json
 *credentials*.json
 *-key.json
+
+# Configuracion local de herramientas: es de esta maquina, no del proyecto.
+.claude/
+.vercel/

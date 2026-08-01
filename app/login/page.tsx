@@ -1,3 +1,4 @@
+import { Radar } from 'lucide-react';
 import { FormularioLogin } from './FormularioLogin.tsx';
 
 /**
@@ -15,10 +16,14 @@ export default async function Login({
   const sp = await searchParams;
 
   return (
-    <div style={{ maxWidth: '380px', margin: '10vh auto', padding: '0 1.5rem' }}>
-      <div className="nav__marca" style={{ padding: '0 0 1.5rem' }}>Prospección</div>
-      <h1 style={{ fontSize: '1.3rem' }}>Entrar</h1>
-      <p className="sub" style={{ marginBottom: '1.5rem' }}>
+    <div className="login">
+      <div className="nav__marca" style={{ padding: '0 0 var(--e6)' }}>
+        <Radar size={17} strokeWidth={2.25} />
+        Prospección
+      </div>
+
+      <h1 style={{ fontSize: 'var(--t-h2)' }}>Entrar</h1>
+      <p className="sub">
         Herramienta interna. Si no tenés cuenta, pedila — no hay registro abierto.
       </p>
 

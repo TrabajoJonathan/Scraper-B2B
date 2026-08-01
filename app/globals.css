@@ -1,217 +1,815 @@
 /*
- * Estilos del panel. CSS plano a propósito: el pedido era estructura, no diseño
- * terminado, y un archivo de variables se reemplaza por Tailwind después sin
- * tocar los componentes.
+ * ============================================================================
+ * Sistema de diseño
+ * ============================================================================
+ *
+ * Referencia: Linear y Vercel. Los dos son OSCUROS — lo que los hace verse así
+ * no es el color de fondo, es lo otro:
+ *
+ *   · grises NEUTROS (sin tinte azul), no un azul oscuro
+ *   · UN solo acento, usado con avaricia
+ *   · bordes casi invisibles en vez de cajas marcadas
+ *   · jerarquía por tamaño y peso de texto, no por bordes y fondos
+ *   · muchísimo aire
+ *   · transiciones de 150ms
+ *
+ * El color semántico (verde/amarillo/rojo) queda SOLO donde previene un error
+ * real: el aviso de datos sintéticos y el de buzón compartido. Todo lo demás es
+ * gris. Un panel donde todo grita, nada grita.
  */
 
 :root {
-  --fondo: #0c1a29;
-  --superficie: #0f2135;
-  --superficie-alta: #13293f;
-  --borde: #20405c;
-  --acento: #38bdf8;
-  --ok: #34d399;
-  --alerta: #fbbf24;
-  --riesgo: #f87171;
-  --texto: #dce9f4;
-  --apagado: #8aa6bd;
+  /* --- grises neutros ------------------------------------------------- */
+  --fondo: #0b0c0e;
+  --superficie: #101114;
+  --superficie-2: #16171b;
+  --superficie-3: #1c1d22;
+  --borde: #212226;
+  --borde-fuerte: #2c2d33;
 
-  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --radio: 10px;
+  --texto: #ecedef;
+  --texto-2: #9b9fa7;
+  --texto-3: #6a6e76;
+
+  /* --- un solo acento ------------------------------------------------- */
+  --acento: #6e8bff;
+  --acento-suave: #6e8bff1a;
+
+  /* --- semánticos: solo donde evitan un error ------------------------- */
+  --exito: #3fb950;
+  --alerta: #d29922;
+  --riesgo: #f0605d;
+
+  /* --- tipografía ---------------------------------------------------- */
+  /* `--fuente-inter` lo inyecta next/font desde el layout. El resto de la pila
+     es el respaldo si la fuente no llegó a cargar. */
+  --sans: var(--fuente-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --t-hero: 2.25rem;   /* 36 - número de métrica */
+  --t-h1: 1.5rem;      /* 24 - título de página */
+  --t-h2: 1.125rem;    /* 18 - sección */
+  --t-cuerpo: 1rem;    /* 16 */
+  --t-desc: 0.875rem;  /* 14 - descripciones, tablas */
+  --t-label: 0.8125rem;/* 13 - etiquetas */
+  --t-micro: 0.75rem;  /* 12 - metadatos */
+
+  /* --- espaciado, base 4 --------------------------------------------- */
+  --e1: 4px;   --e2: 8px;   --e3: 12px;  --e4: 16px;
+  --e5: 24px;  --e6: 32px;  --e7: 48px;  --e8: 64px;
+
+  --radio: 12px;
+  --radio-sm: 8px;
+  --radio-xs: 6px;
+
+  --transicion: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
   background: var(--fondo);
   color: var(--texto);
   font-family: var(--sans);
-  line-height: 1.55;
+  font-size: var(--t-cuerpo);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
 }
 
-a { color: var(--acento); text-decoration: none; }
-a:hover { text-decoration: underline; }
+a { color: inherit; text-decoration: none; }
 
-/* ---------------------------------------------------------------- estructura */
+/* ============================================================ estructura */
+
 .shell { display: flex; min-height: 100vh; }
 
 .nav {
-  width: 220px;
+  width: 240px;
   flex: none;
   background: var(--superficie);
   border-right: 1px solid var(--borde);
-  padding: 1.25rem 0;
+  padding: var(--e5) 0 var(--e4);
   display: flex;
   flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
 }
+
 .nav__marca {
-  font-family: var(--mono);
-  font-size: .72rem;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-  color: var(--acento);
-  padding: 0 1.25rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: var(--e2);
+  padding: 0 var(--e4) var(--e6);
+  font-size: var(--t-desc);
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
-.nav a {
-  display: block;
-  padding: .55rem 1.25rem;
+.nav__marca svg { color: var(--acento); }
+
+.nav__accion { padding: 0 var(--e3) var(--e5); }
+.nav__cta { width: 100%; }
+
+.nav__grupo { padding: 0 var(--e3) var(--e4); }
+.nav__titulo {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--texto-3);
+  padding: 0 var(--e3) var(--e2);
+}
+
+.nav__enlace {
+  display: flex;
+  align-items: center;
+  gap: var(--e3);
+  padding: var(--e2) var(--e3);
+  margin-bottom: 2px;
+  border-radius: var(--radio-xs);
+  color: var(--texto-2);
+  font-size: var(--t-desc);
+  font-weight: 450;
+  transition: background var(--transicion), color var(--transicion);
+}
+.nav__enlace svg { flex: none; opacity: 0.8; }
+.nav__enlace:hover { background: var(--superficie-2); color: var(--texto); }
+.nav__enlace[aria-current="page"] {
+  background: var(--superficie-3);
   color: var(--texto);
-  border-left: 2px solid transparent;
-  font-size: .92rem;
-}
-.nav a:hover { background: var(--superficie-alta); text-decoration: none; }
-.nav a[aria-current="page"] { border-left-color: var(--acento); background: var(--superficie-alta); }
-
-.nav__pie {
-  margin-top: auto;
-  padding: 1rem 1.25rem 0;
-  border-top: 1px solid var(--borde);
-  font-size: .72rem;
-  color: var(--apagado);
-}
-
-.contenido { flex: 1; padding: 2rem 2.25rem; max-width: 1200px; }
-
-h1 { font-size: 1.5rem; margin: 0 0 .35rem; letter-spacing: -.01em; }
-h2 { font-size: 1.05rem; margin: 2rem 0 .75rem; }
-.sub { color: var(--apagado); margin: 0 0 1.75rem; max-width: 68ch; }
-
-/* -------------------------------------------------------------------- avisos */
-.aviso {
-  border: 1px solid var(--alerta);
-  background: #2b241055;
-  color: #fdf0cd;
-  border-radius: var(--radio);
-  padding: .7rem .95rem;
-  font-size: .85rem;
-  margin-bottom: 1.5rem;
-}
-.aviso strong { color: var(--alerta); }
-
-/* ------------------------------------------------------------------ tarjetas */
-.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .9rem; }
-.tarjeta {
-  background: var(--superficie);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  padding: .9rem 1rem;
-}
-.tarjeta__valor { font-size: 1.7rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.tarjeta__etiqueta { font-size: .78rem; color: var(--apagado); }
-
-/* --------------------------------------------------------------------- tabla */
-.tabla { width: 100%; border-collapse: collapse; font-size: .88rem; }
-.tabla th {
-  text-align: left;
-  font-family: var(--mono);
-  font-size: .7rem;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--apagado);
-  border-bottom: 1px solid var(--borde);
-  padding: .5rem .6rem;
   font-weight: 500;
 }
-.tabla td { padding: .6rem; border-bottom: 1px solid #16304726; vertical-align: top; }
-.tabla tr:hover td { background: var(--superficie); }
-.tabla__vacia { color: var(--apagado); padding: 2rem .6rem; text-align: center; }
+.nav__enlace[aria-current="page"] svg { color: var(--acento); opacity: 1; }
 
-.score {
-  font-family: var(--mono);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+/* Bloque del usuario, abajo */
+.nav__usuario {
+  margin-top: auto;
+  padding: var(--e4) var(--e3) 0;
+  border-top: 1px solid var(--borde);
 }
-.score--alto { color: var(--ok); }
-.score--medio { color: var(--alerta); }
-.score--bajo { color: var(--apagado); }
-.score--nulo { color: var(--apagado); font-weight: 400; }
-
-.razon { color: var(--apagado); font-size: .8rem; display: block; margin-top: .15rem; }
-
-/* -------------------------------------------------------------------- píldora */
-.pildora {
-  display: inline-block;
-  font-family: var(--mono);
-  font-size: .68rem;
-  padding: .12rem .45rem;
-  border-radius: 999px;
-  border: 1px solid var(--borde);
-  color: var(--apagado);
+.nav__perfil {
+  display: flex;
+  align-items: center;
+  gap: var(--e2);
+  padding: var(--e1) var(--e2);
+  border-radius: var(--radio-xs);
+}
+.nav__correo {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--t-micro);
+  color: var(--texto-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pildora--ok { border-color: var(--ok); color: var(--ok); }
-.pildora--alerta { border-color: var(--alerta); color: var(--alerta); }
-.pildora--riesgo { border-color: var(--riesgo); color: var(--riesgo); }
+button.nav__salir { padding: var(--e1) var(--e1); flex: none; }
 
-/* ------------------------------------------------------------------ progreso */
-.progreso { background: var(--superficie-alta); border-radius: 999px; height: 8px; overflow: hidden; }
-.progreso__barra { background: var(--acento); height: 100%; transition: width .3s; }
-.pasos { display: flex; gap: .4rem; flex-wrap: wrap; margin: .9rem 0; }
-.paso {
-  font-family: var(--mono);
-  font-size: .72rem;
-  padding: .25rem .6rem;
-  border-radius: var(--radio);
-  border: 1px solid var(--borde);
-  color: var(--apagado);
-}
-.paso--hecho { border-color: var(--ok); color: var(--ok); }
-.paso--actual { border-color: var(--acento); color: var(--acento); background: #0b3a5233; }
-
-/* ----------------------------------------------------------------- borradores */
-.borrador {
-  background: var(--superficie);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  padding: 1.1rem 1.25rem;
-  margin-bottom: 1.1rem;
-}
-.borrador__cabeza { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
-.borrador__asunto { font-weight: 600; margin: .8rem 0 .5rem; }
-.borrador__cuerpo {
-  white-space: pre-wrap;
-  background: var(--fondo);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  padding: .85rem 1rem;
-  font-size: .9rem;
-}
-.borrador__acciones { display: flex; gap: .5rem; margin-top: .9rem; align-items: center; }
-
-/* --------------------------------------------------------------------- forms */
-label { display: block; font-size: .8rem; color: var(--apagado); margin-bottom: .25rem; }
-input[type="text"], select, textarea {
-  width: 100%;
-  background: var(--fondo);
-  border: 1px solid var(--borde);
-  color: var(--texto);
-  border-radius: var(--radio);
-  padding: .5rem .7rem;
-  font-family: inherit;
-  font-size: .9rem;
-}
-textarea { min-height: 140px; font-size: .88rem; }
-.campo { margin-bottom: 1rem; }
-.fila { display: flex; gap: .9rem; flex-wrap: wrap; align-items: flex-end; }
-.fila > * { flex: 1; min-width: 150px; }
-
-button {
-  background: var(--acento);
-  color: #062032;
-  border: 0;
-  border-radius: var(--radio);
-  padding: .5rem 1rem;
-  font-family: inherit;
+.avatar {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--superficie-3);
+  border: 1px solid var(--borde-fuerte);
+  color: var(--texto-2);
+  font-size: var(--t-micro);
   font-weight: 600;
-  font-size: .88rem;
-  cursor: pointer;
+  display: grid;
+  place-items: center;
 }
-button:hover { filter: brightness(1.1); }
-button.secundario { background: transparent; border: 1px solid var(--borde); color: var(--texto); }
-button.peligro { background: transparent; border: 1px solid var(--riesgo); color: var(--riesgo); }
-button:disabled { opacity: .45; cursor: not-allowed; }
 
-.mono { font-family: var(--mono); font-size: .82rem; }
-.apagado { color: var(--apagado); }
+.nav__nota {
+  font-size: 0.6875rem;
+  line-height: 1.6;
+  color: var(--texto-3);
+  padding: var(--e3) var(--e2) 0;
+}
+
+/* Punto de estado. Late solo cuando algo está corriendo de verdad. */
+.punto {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.punto--late { animation: latir 1.6s ease-in-out infinite; }
+@keyframes latir {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .punto--late { animation: none; }
+  * { transition-duration: 0.01ms !important; }
+}
+
+.contenido {
+  flex: 1;
+  min-width: 0;
+  padding: var(--e7) var(--e7) var(--e8);
+  max-width: 1180px;
+}
+
+/* ============================================================ tipografía */
+
+h1, .pagina__titulo {
+  font-size: var(--t-h1);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--e2);
+}
+
+/* La bajada explica el POR QUÉ de la pantalla. Va en gris y a 72ch: si midiera
+   todo el ancho, el ojo pierde el renglón al volver. */
+.sub, .pagina__sub {
+  color: var(--texto-2);
+  font-size: var(--t-desc);
+  margin: 0 0 var(--e6);
+  max-width: 72ch;
+  line-height: 1.6;
+}
+.sub strong { color: var(--texto); font-weight: 550; }
+
+h2, .seccion {
+  font-size: var(--t-h2);
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  margin: var(--e7) 0 var(--e4);
+}
+
+.label {
+  font-size: var(--t-label);
+  color: var(--texto-2);
+  font-weight: 450;
+}
+.tenue, .apagado { color: var(--texto-3); }
+.mono { font-family: var(--mono); font-size: var(--t-desc); font-variant-numeric: tabular-nums; }
+
+/* La razón del score, debajo del nombre del negocio. Bloque propio y chica:
+   es evidencia de apoyo, no compite con el nombre. */
+.razon {
+  display: block;
+  font-size: var(--t-micro);
+  color: var(--texto-3);
+  line-height: 1.5;
+  margin-top: 2px;
+  max-width: 46ch;
+}
+
+/* ================================================ métricas (sin cajas) */
+
+.metricas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--e6) var(--e5);
+  padding-bottom: var(--e6);
+  border-bottom: 1px solid var(--borde);
+}
+.metrica__valor {
+  font-size: var(--t-hero);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.metrica__etiqueta {
+  font-size: var(--t-desc);
+  color: var(--texto-2);
+  margin-top: var(--e1);
+}
+.metrica--enlace { display: block; transition: opacity var(--transicion); }
+.metrica--enlace:hover { opacity: 0.75; }
+.metrica--enlace:hover .metrica__etiqueta { color: var(--texto); }
+
+/* Enlace de apoyo: «ver todas», «ver los leads de esta corrida». Gris hasta que
+   el mouse encima confirma que es un enlace. */
+.enlace-sutil {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e1);
+  font-size: var(--t-desc);
+  color: var(--texto-2);
+  transition: color var(--transicion);
+}
+.enlace-sutil:hover { color: var(--acento); }
+
+/* ================================================================= tabla */
+
+.tabla { width: 100%; border-collapse: collapse; font-size: var(--t-desc); }
+.tabla th {
+  text-align: left;
+  font-size: var(--t-micro);
+  font-weight: 500;
+  color: var(--texto-3);
+  padding: 0 var(--e3) var(--e2);
+  border-bottom: 1px solid var(--borde);
+  white-space: nowrap;
+}
+.tabla td {
+  padding: var(--e3);
+  border-bottom: 1px solid var(--borde);
+  vertical-align: middle;
+}
+.tabla tbody tr { transition: background var(--transicion); }
+.tabla tbody tr:hover { background: var(--superficie); }
+.tabla__principal { font-weight: 500; color: var(--texto); }
+.tabla__meta { font-size: var(--t-micro); color: var(--texto-3); margin-top: 2px; }
+
+.vacio, .tabla__vacia {
+  padding: var(--e7) var(--e4);
+  text-align: center;
+  color: var(--texto-3);
+  font-size: var(--t-desc);
+  line-height: 1.7;
+  border: 1px dashed var(--borde-fuerte);
+  border-radius: var(--radio);
+}
+.vacio a, .tabla__vacia a { color: var(--acento); }
+
+/* ========================================== embudo (leads por estado) */
+/*
+ * Antes esto era una tabla de dos columnas: «estado | número». Una tabla de dos
+ * columnas no es una tabla, es una lista — y peor: no mostraba que los estados
+ * son ETAPAS de un embudo, ni dónde se está cayendo la gente. La barra
+ * proporcional dice eso de un vistazo sin agregar ningún dato nuevo.
+ */
+.embudo { display: flex; flex-direction: column; gap: var(--e3); max-width: 620px; }
+.embudo__fila { display: grid; grid-template-columns: 1fr 3rem; gap: var(--e4); align-items: center; }
+.embudo__etiqueta { font-size: var(--t-desc); color: var(--texto-2); margin-bottom: var(--e1); }
+.embudo__pista { background: var(--superficie-2); border-radius: 3px; height: 6px; overflow: hidden; }
+.embudo__barra { background: var(--borde-fuerte); height: 100%; border-radius: 3px; }
+.embudo__fila--foco .embudo__etiqueta { color: var(--texto); }
+.embudo__fila--foco .embudo__barra { background: var(--acento); }
+.embudo__n {
+  font-size: var(--t-cuerpo);
+  font-weight: 550;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================================================================= score */
+
+.score { font-family: var(--mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+.score--alto { color: var(--texto); }
+.score--medio { color: var(--texto-2); }
+.score--bajo { color: var(--texto-3); }
+.score--nulo { color: var(--texto-3); }
+
+/* =============================================================== píldora */
+
+.pildora {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e1);
+  font-size: var(--t-micro);
+  padding: 2px var(--e2);
+  border-radius: var(--radio-xs);
+  background: var(--superficie-2);
+  color: var(--texto-2);
+  white-space: nowrap;
+  line-height: 1.5;
+}
+.pildora--exito { color: var(--exito); background: #3fb95015; }
+.pildora--alerta { color: var(--alerta); background: #d2992215; }
+.pildora--riesgo { color: var(--riesgo); background: #f0605d15; }
+.pildora--acento { color: var(--acento); background: var(--acento-suave); }
+
+/* ============================================================== progreso */
+
+.progreso {
+  background: var(--superficie-3);
+  border-radius: 99px;
+  height: 4px;
+  overflow: hidden;
+  min-width: 60px;
+}
+.progreso__barra {
+  background: var(--acento);
+  height: 100%;
+  border-radius: 99px;
+  transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pasos {
+  display: flex;
+  gap: var(--e4);
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.paso {
+  display: flex;
+  align-items: center;
+  gap: var(--e2);
+  font-size: var(--t-label);
+  color: var(--texto-3);
+}
+.paso svg { flex: none; }
+.paso--hecho { color: var(--texto-2); }
+.paso--hecho svg { color: var(--exito); }
+.paso--actual { color: var(--texto); font-weight: 500; }
+.paso--actual svg { color: var(--acento); }
+
+.gira { animation: girar 1.1s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .gira { animation: none; } }
+
+/* ================================================================ panel */
+/* Contenedor para un grupo que SÍ es una unidad (p.ej. el estado de una
+   corrida). No para números sueltos — ahí la caja solo agrega ruido. */
+
+.panel {
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  overflow: hidden;
+  margin-bottom: var(--e6);
+}
+.panel__cabeza {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--e4);
+  padding: var(--e3) var(--e5);
+  border-bottom: 1px solid var(--borde);
+  flex-wrap: wrap;
+}
+.panel__cuerpo { padding: var(--e5); }
+.panel__pie {
+  display: flex;
+  gap: var(--e3);
+  align-items: flex-start;
+  padding: var(--e3) var(--e5);
+  border-top: 1px solid var(--borde);
+  background: var(--fondo);
+  font-size: var(--t-label);
+  color: var(--texto-2);
+  line-height: 1.6;
+}
+.panel__pie svg { flex: none; margin-top: 3px; color: var(--texto-3); }
+.panel__pie strong { color: var(--texto); font-weight: 550; }
+
+/* Miga de pan. Un solo salto hacia arriba: más niveles serían inventados. */
+.miga {
+  font-size: var(--t-label);
+  color: var(--texto-3);
+  margin-bottom: var(--e3);
+}
+.miga a { transition: color var(--transicion); }
+.miga a:hover { color: var(--texto); }
+
+/* =============================================================== avisos */
+/* Solo dos usos legítimos: datos sintéticos y buzón compartido. */
+
+.aviso {
+  display: flex;
+  gap: var(--e3);
+  padding: var(--e3) var(--e4);
+  border-radius: var(--radio-sm);
+  font-size: var(--t-desc);
+  line-height: 1.55;
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+  color: var(--texto-2);
+}
+.aviso svg { flex: none; margin-top: 3px; }
+.aviso strong { color: var(--texto); font-weight: 550; }
+.aviso--alerta { border-color: #d2992240; }
+.aviso--alerta svg { color: var(--alerta); }
+.aviso--riesgo { border-color: #f0605d40; }
+.aviso--riesgo svg { color: var(--riesgo); }
+
+/* ============================================================== botones */
+/* Tres variantes. No más. */
+
+button, .boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--e2);
+  font-family: inherit;
+  font-size: var(--t-desc);
+  font-weight: 500;
+  padding: var(--e2) var(--e4);
+  border-radius: var(--radio-xs);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background var(--transicion), border-color var(--transicion), opacity var(--transicion);
+  white-space: nowrap;
+}
+
+/* Primario: claro sobre oscuro. Uno por pantalla. */
+button, .boton--primario {
+  background: var(--texto);
+  color: var(--fondo);
+}
+button:hover, .boton--primario:hover { background: #fff; }
+
+/* Secundario: borde sutil. */
+button.secundario, .boton--secundario {
+  background: transparent;
+  border-color: var(--borde-fuerte);
+  color: var(--texto);
+}
+button.secundario:hover { background: var(--superficie-2); border-color: var(--texto-3); }
+
+/* Ghost: solo texto. */
+button.ghost {
+  background: transparent;
+  color: var(--texto-2);
+  padding: var(--e2) var(--e3);
+}
+button.ghost:hover { background: var(--superficie-2); color: var(--texto); }
+
+/* Peligro: NO es un botón rojo lleno. Descartar es reversible y frecuente;
+   pintarlo como un botón de borrado nuclear entrena a la gente a temerlo. */
+button.peligro {
+  background: transparent;
+  border-color: var(--borde-fuerte);
+  color: var(--texto-2);
+}
+button.peligro:hover { background: #f0605d12; border-color: #f0605d55; color: var(--riesgo); }
+
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button:disabled:hover { background: var(--texto); }
+button.secundario:disabled:hover, button.peligro:disabled:hover,
+button.ghost:disabled:hover { background: transparent; }
+
+/* Sin `border-radius` acá: redondear al enfocar deformaría las filas de la lista
+   y las métricas. El `outline-offset` ya separa lo suficiente para verse. */
+button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+/* =============================================================== formas */
+
+label {
+  display: block;
+  font-size: var(--t-label);
+  color: var(--texto-2);
+  margin-bottom: var(--e2);
+  font-weight: 450;
+}
+
+input[type="text"], input[type="email"], input[type="password"], select, textarea {
+  width: 100%;
+  background: var(--superficie);
+  border: 1px solid var(--borde-fuerte);
+  color: var(--texto);
+  border-radius: var(--radio-xs);
+  padding: var(--e2) var(--e3);
+  font-family: inherit;
+  font-size: var(--t-desc);
+  transition: border-color var(--transicion), box-shadow var(--transicion);
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: none;
+  border-color: var(--acento);
+  box-shadow: 0 0 0 3px var(--acento-suave);
+}
+input::placeholder, textarea::placeholder { color: var(--texto-3); }
+textarea { min-height: 200px; line-height: 1.65; resize: vertical; }
+
+/* Barra de filtros: controles del ancho de su contenido, en una sola fila. */
+.barra {
+  display: flex;
+  gap: var(--e2);
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: var(--e5);
+}
+.select-auto { width: auto; min-width: 9rem; }
+
+.busca { position: relative; flex: 1; min-width: 200px; max-width: 320px; }
+.busca svg {
+  position: absolute;
+  left: var(--e3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--texto-3);
+  pointer-events: none;
+}
+.busca input { padding-left: calc(var(--e3) + 20px); }
+
+.campo { margin-bottom: var(--e4); }
+.campo--ancho { max-width: 520px; }
+.fila { display: flex; gap: var(--e4); flex-wrap: wrap; align-items: flex-start; }
+.fila > .campo { flex: 1; min-width: 180px; }
+
+/* Un formulario no debe medir 1180px de ancho: un campo de texto larguísimo no
+   ayuda a llenarlo, y el ojo pierde la relación entre etiqueta y campo. */
+.angosto { max-width: 640px; }
+
+/* Lista de definiciones para la ayuda de los campos. */
+.ayuda { margin: 0; }
+.ayuda dt {
+  font-size: var(--t-desc);
+  font-weight: 550;
+  color: var(--texto);
+  margin-top: var(--e4);
+}
+.ayuda dt:first-child { margin-top: 0; }
+.ayuda dd {
+  margin: var(--e1) 0 0;
+  font-size: var(--t-desc);
+  color: var(--texto-2);
+  line-height: 1.65;
+  max-width: 68ch;
+}
+
+/* ==================================== revisión: dos columnas tipo Gmail */
+
+.revision {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: var(--e4);
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .revision { grid-template-columns: 1fr; }
+  /* En pantalla angosta la lista se recorta: si midiera 20 borradores de alto,
+     el correo elegido quedaría fuera de la pantalla y habría que buscarlo. */
+  .revision .lista { max-height: 260px; overflow-y: auto; }
+}
+
+.lista {
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  overflow: hidden;
+  background: var(--superficie);
+  position: sticky;
+  top: var(--e5);
+  max-height: calc(100vh - var(--e8));
+  overflow-y: auto;
+}
+.lista__item {
+  display: block;
+  padding: var(--e3) var(--e4);
+  border-bottom: 1px solid var(--borde);
+  border-left: 2px solid transparent;
+  transition: background var(--transicion), border-color var(--transicion);
+}
+.lista__item:last-child { border-bottom: 0; }
+.lista__item:hover { background: var(--superficie-2); }
+.lista__item[aria-current="true"] {
+  background: var(--superficie-3);
+  border-left-color: var(--acento);
+}
+.lista__cabeza {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--e2);
+  align-items: baseline;
+}
+.lista__nombre {
+  font-size: var(--t-desc);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lista__meta {
+  font-size: var(--t-micro);
+  color: var(--texto-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+}
+.lista__marca {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e1);
+  font-size: 0.6875rem;
+  color: var(--alerta);
+  margin-top: var(--e1);
+}
+
+.correo {
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  overflow: hidden;
+}
+.correo__cabeza { padding: var(--e5); border-bottom: 1px solid var(--borde); }
+.correo__negocio {
+  font-size: var(--t-cuerpo);
+  font-weight: 550;
+  letter-spacing: -0.01em;
+}
+.correo__para { font-size: var(--t-micro); color: var(--texto-3); }
+.correo__razon {
+  font-size: var(--t-label);
+  color: var(--texto-2);
+  line-height: 1.6;
+  margin: var(--e3) 0 0;
+  max-width: 70ch;
+}
+.correo__razon .label { color: var(--texto-3); }
+
+/* Asunto con su etiqueta: en un correo el asunto es un campo, no un título de
+   página. Etiquetarlo evita que se lea como el encabezado de la pantalla. */
+.correo__asunto-fila { padding: var(--e5) var(--e5) 0; }
+.correo__asunto {
+  font-size: var(--t-h2);
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  margin: var(--e1) 0 0;
+}
+
+.correo__cuerpo {
+  padding: var(--e5);
+  white-space: pre-wrap;
+  font-size: var(--t-desc);
+  line-height: 1.75;
+  color: var(--texto);
+  max-width: 68ch;
+}
+.correo__pie {
+  padding: var(--e4) var(--e5);
+  border-top: 1px solid var(--borde);
+  background: var(--fondo);
+  display: flex;
+  gap: var(--e2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.correo__nota {
+  padding: 0 var(--e5) var(--e5);
+  margin: var(--e4) 0 0;
+  font-size: var(--t-micro);
+  color: var(--texto-3);
+  line-height: 1.6;
+  max-width: 70ch;
+}
+
+/* ================================================================ login */
+
+.login { max-width: 360px; margin: 14vh auto; padding: 0 var(--e5); }
+.login .sub { margin-bottom: var(--e6); }
+
+.error {
+  font-size: var(--t-label);
+  color: var(--riesgo);
+  margin: 0 0 var(--e2);
+  line-height: 1.5;
+}
+
+/* ========================================================== utilidades */
+
+.divisor { border: 0; border-top: 1px solid var(--borde); margin: var(--e6) 0; }
+.entre { display: flex; justify-content: space-between; align-items: center; gap: var(--e4); }
+.grupo { display: flex; gap: var(--e2); align-items: center; flex-wrap: wrap; }
+.apila { display: flex; flex-direction: column; gap: var(--e4); }
+
+/* ========================================================== pantalla chica */
+/*
+ * Es una herramienta de escritorio: nadie va a prospectar desde el teléfono. Pero
+ * alguien LA VA A ABRIR desde el teléfono para mostrarla, y una barra lateral fija
+ * de 240px sobre una pantalla de 390px deja el contenido en 150px. Así que el
+ * sidebar se acuesta y pasa a ser una barra arriba.
+ */
+@media (max-width: 760px) {
+  .shell { flex-direction: column; }
+
+  .nav {
+    width: auto;
+    height: auto;
+    position: static;
+    border-right: 0;
+    border-bottom: 1px solid var(--borde);
+    padding: var(--e4) var(--e4) var(--e3);
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--e3);
+  }
+  .nav__marca { padding: 0; margin-right: auto; }
+  .nav__accion { padding: 0; order: 3; }
+  .nav__cta { width: auto; }
+
+  .nav__grupo { display: flex; gap: var(--e1); padding: 0; order: 4; }
+  .nav__titulo { display: none; } /* los grupos se leen mal en horizontal */
+  .nav__enlace { margin-bottom: 0; }
+
+  .nav__usuario { margin: 0; padding: 0; border-top: 0; order: 2; }
+  .nav__correo { display: none; } /* el avatar ya dice quién está */
+  .nav__nota { display: none; }
+
+  .contenido { padding: var(--e5) var(--e4) var(--e7); }
+  .metricas { gap: var(--e5) var(--e4); }
+  .metrica__valor { font-size: var(--t-h1); }
+  .tabla { font-size: var(--t-label); }
+  .correo__pie form { width: 100%; }
+}
+
+/* Envoltura de tabla: si no cabe, se desplaza DENTRO de su contenedor. Sin esto
+   la página entera scrollea de lado y el sidebar se sale de la pantalla. */
+.tabla-scroll { overflow-x: auto; }
+.tabla-scroll > .tabla { min-width: 560px; }

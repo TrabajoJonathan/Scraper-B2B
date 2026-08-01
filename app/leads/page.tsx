@@ -1,9 +1,10 @@
+import { Globe, Search } from 'lucide-react';
 import {
   listarLeads,
   conteoPorEstado,
   type FiltrosLeads,
 } from '../../src/servicios/panelService.ts';
-import { Score, VerificacionPildora } from '../componentes/Pildoras.tsx';
+import { Score, VerificacionPildora, etiquetaEstado } from '../componentes/Pildoras.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,89 +47,140 @@ export default async function Leads({
         de contacto quedan igual en la lista, marcados, para poder revisarlos.
       </p>
 
-      {/* GET normal: los filtros terminan en la URL y el enlace se puede compartir. */}
-      <form className="fila" style={{ marginBottom: '1.5rem' }}>
+      {/*
+        Barra de filtros.
+        --------------------------------------------------------------------
+        Sigue siendo un GET normal (los filtros terminan en la URL y el enlace se
+        puede compartir). Lo que cambió es la forma: antes eran tres campos
+        sueltos del mismo ancho que el contenido, y parecían un formulario de
+        carga. Ahora es una barra compacta: los controles miden lo que necesita su
+        contenido, el buscador lleva su icono adentro, y el botón queda al final
+        de la fila y no debajo.
+      */}
+      <form className="barra">
         {sp['busqueda'] !== undefined && (
           <input type="hidden" name="busqueda" value={sp['busqueda']} />
         )}
-        <div>
-          <label htmlFor="texto">Buscar por nombre</label>
-          <input id="texto" name="texto" type="text" defaultValue={sp['texto'] ?? ''} />
+
+        <div className="busca">
+          <Search size={14} strokeWidth={2.25} />
+          <input
+            id="texto"
+            name="texto"
+            type="text"
+            placeholder="Buscar por nombre…"
+            aria-label="Buscar por nombre"
+            defaultValue={sp['texto'] ?? ''}
+          />
         </div>
-        <div>
-          <label htmlFor="estado">Estado</label>
-          <select id="estado" name="estado" defaultValue={sp['estado'] ?? ''}>
-            <option value="">todos</option>
-            {Object.entries(estados).map(([e, n]) => (
-              <option key={e} value={e}>{e} ({n})</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="email">Correo</label>
-          <select id="email" name="email" defaultValue={sp['email'] ?? ''}>
-            <option value="">todos</option>
-            <option value="con">con correo</option>
-            <option value="sin">sin correo</option>
-          </select>
-        </div>
-        <div style={{ flex: '0 0 auto' }}>
-          <button type="submit">Filtrar</button>
-        </div>
+
+        <select
+          id="estado"
+          name="estado"
+          aria-label="Filtrar por etapa"
+          defaultValue={sp['estado'] ?? ''}
+          className="select-auto"
+        >
+          <option value="">Todas las etapas</option>
+          {Object.entries(estados).map(([e, n]) => (
+            <option key={e} value={e}>
+              {etiquetaEstado(e)} ({n})
+            </option>
+          ))}
+        </select>
+
+        <select
+          id="email"
+          name="email"
+          aria-label="Filtrar por correo"
+          defaultValue={sp['email'] ?? ''}
+          className="select-auto"
+        >
+          <option value="">Con y sin correo</option>
+          <option value="con">Solo con correo</option>
+          <option value="sin">Solo sin correo</option>
+        </select>
+
+        <button type="submit" className="secundario">
+          Filtrar
+        </button>
       </form>
 
       {leads.length === 0 ? (
         <p className="tabla__vacia">
-          Ningún lead con esos filtros. Si nunca corriste una búsqueda, empezá por Corridas.
+          Ningún lead con esos filtros.
+          <br />
+          Si nunca corriste una búsqueda, empezá por Corridas.
         </p>
       ) : (
         <>
-          <p className="apagado mono" style={{ marginBottom: '.5rem' }}>
-            {leads.length} lead(s)
+          <p className="tenue" style={{ fontSize: 'var(--t-label)', margin: '0 0 var(--e3)' }}>
+            {leads.length} {leads.length === 1 ? 'lead' : 'leads'}
           </p>
+
+          <div className="tabla-scroll">
           <table className="tabla">
             <thead>
               <tr>
-                <th style={{ width: '3rem' }}>Score</th>
+                <th style={{ width: '3.5rem' }}>Score</th>
                 <th>Negocio</th>
                 <th>Correo</th>
-                <th>Reseñas</th>
-                <th>Estado</th>
+                <th style={{ width: '6rem' }}>Reseñas</th>
+                <th>Etapa</th>
               </tr>
             </thead>
             <tbody>
               {leads.map((l) => (
                 <tr key={l.prospeccionId}>
-                  <td><Score valor={l.score} /></td>
                   <td>
-                    <strong>{l.negocio}</strong>
+                    <Score valor={l.score} />
+                  </td>
+
+                  {/*
+                    Nombre primario, razón del score debajo en chico. La razón es
+                    la explicación de POR QUÉ ese lead está arriba — tiene que
+                    estar visible sin abrir nada, pero no puede competir con el
+                    nombre del negocio.
+                  */}
+                  <td>
+                    <span className="tabla__principal">{l.negocio}</span>
                     {l.razon !== null && <span className="razon">{l.razon}</span>}
                     {l.sitioWeb === null && (
-                      <span className="razon" style={{ color: 'var(--alerta)' }}>
+                      <span className="tabla__meta grupo" style={{ gap: 'var(--e1)' }}>
+                        <Globe size={11} strokeWidth={2} />
                         sin sitio web
                       </span>
                     )}
                   </td>
+
                   <td>
                     {l.email === null ? (
-                      <span className="apagado">—</span>
+                      <span className="tenue">—</span>
                     ) : (
                       <>
-                        <span className="mono" style={{ fontSize: '.8rem' }}>{l.email}</span>
-                        <br />
-                        <VerificacionPildora estado={l.estadoVerificacion} />
+                        <div className="mono" style={{ fontSize: 'var(--t-micro)' }}>
+                          {l.email}
+                        </div>
+                        <div style={{ marginTop: '3px' }}>
+                          <VerificacionPildora estado={l.estadoVerificacion} />
+                        </div>
                       </>
                     )}
                   </td>
-                  <td className="mono apagado">
+
+                  <td className="mono tenue">
                     {l.numResenas ?? '—'}
                     {l.rating !== null && ` · ${l.rating}★`}
                   </td>
-                  <td><span className="mono apagado" style={{ fontSize: '.78rem' }}>{l.estado}</span></td>
+
+                  <td className="tenue" style={{ fontSize: 'var(--t-micro)' }}>
+                    {etiquetaEstado(l.estado)}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </>
       )}
     </>

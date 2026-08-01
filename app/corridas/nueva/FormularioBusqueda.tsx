@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { Search } from 'lucide-react';
 import { accionCrearCorrida, type EstadoAccion } from '../../lib/acciones.ts';
 
 /**
@@ -81,10 +82,13 @@ export function FormularioBusqueda() {
       </div>
 
       {estado !== null && !estado.ok && (
-        <p style={{ color: 'var(--riesgo)' }}>{estado.mensaje}</p>
+        <p className="error" role="alert">
+          {estado.mensaje}
+        </p>
       )}
 
-      <button type="submit" disabled={pendiente}>
+      <button type="submit" disabled={pendiente} style={{ marginTop: 'var(--e2)' }}>
+        <Search size={15} strokeWidth={2.5} />
         {pendiente ? 'Encargando…' : 'Encargar búsqueda'}
       </button>
     </form>

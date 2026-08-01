@@ -30,10 +30,14 @@ export function FormularioLogin({ volver }: { volver: string }) {
       </div>
 
       {estado !== null && !estado.ok && (
-        <p style={{ color: 'var(--riesgo)', fontSize: '.88rem' }}>{estado.mensaje}</p>
+        // `role="alert"` para que un lector de pantalla lo anuncie: si no, el
+        // error aparece en silencio y el usuario sigue esperando.
+        <p className="error" role="alert">
+          {estado.mensaje}
+        </p>
       )}
 
-      <button type="submit" disabled={pendiente} style={{ width: '100%' }}>
+      <button type="submit" disabled={pendiente} style={{ width: '100%', marginTop: 'var(--e2)' }}>
         {pendiente ? 'Entrando…' : 'Entrar'}
       </button>
     </form>
