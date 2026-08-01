@@ -12,3 +12,8 @@ salidas/
 next-env.d.ts
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+
+# Credenciales descargadas de consolas (Google Cloud, etc.). Nunca al repo.
+client_secret_*.json
+*credentials*.json
+*-key.json
