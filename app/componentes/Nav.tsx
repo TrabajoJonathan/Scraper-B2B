@@ -61,9 +61,19 @@ export function Nav({ emailEmpleado, accionSalir }: Props) {
 
   return (
     <nav className="nav">
+      {/*
+        Misma marca que el login: tile con degradado + nombre + bajada.
+        Es el hilo que hace que entrar no se sienta como cambiar de aplicación —
+        el truco que usa OMEGA, donde el azul del login es el azul del sidebar.
+      */}
       <div className="nav__marca">
-        <Radar size={17} strokeWidth={2.25} />
-        Prospección
+        <span className="nav__tile">
+          <Radar size={15} strokeWidth={2.5} />
+        </span>
+        <span>
+          <span className="nav__nombre">CodeFlow</span>
+          <span className="nav__bajada">Prospección B2B</span>
+        </span>
       </div>
 
       {/*
