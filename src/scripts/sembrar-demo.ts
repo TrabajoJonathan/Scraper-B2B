@@ -57,6 +57,22 @@ try {
     const { corridaId, busquedaId } = await crearCorrida(spec, 'ana@code-flow-ai.com');
     console.log(`corrida creada: ${corridaId}`);
 
+    /*
+     * Marcarla como sintética A MANO, y de entrada.
+     *
+     * Este script no pasa por `tick()` —llama a los servicios uno por uno para
+     * simular el recorrido del cron— así que se saltea el único lugar que
+     * escribe `con_fixtures`. Resultado: la corrida MÁS falsa de la base era la
+     * única sin el aviso, y es justo la que se usa para mostrar el sistema.
+     *
+     * Se pone antes de sembrar nada y no al final: si el script se corta a la
+     * mitad, lo que quede tiene que estar marcado igual.
+     */
+    await poolPostgres().query(
+      `update corridas set con_fixtures = true, fixtures_en = $2 where id = $1`,
+      [corridaId, ['los negocios y sus sitios web', 'la verificación de entregabilidad', 'la redacción de los correos']],
+    );
+
     const traer = traerDeFixture();
     const { negocios } = await buscar(spec, { limite: 60, lector: lectorDeFixture() });
     await guardarDescubrimiento(busquedaId, negocios);

@@ -39,6 +39,14 @@ export type Corrida = {
    * Sus leads no son negocios reales. La interfaz lo avisa.
    */
   con_fixtures: boolean;
+  /**
+   * Qué partes salieron de fixture, en lenguaje de empleado («los negocios»,
+   * «los correos de contacto»). Vacío = corrida enteramente real.
+   * Existe porque desde que hay unas llaves y otras no, una corrida puede
+   * mezclar negocios reales con correos inventados — y eso es más peligroso que
+   * tener todo falso, porque el dato real le presta credibilidad al falso.
+   */
+  fixtures_en: string[];
   creada_por_email: string | null;
   creada_en: string;
   iniciada_en: string | null;

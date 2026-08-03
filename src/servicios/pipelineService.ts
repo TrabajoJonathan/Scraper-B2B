@@ -50,49 +50,103 @@ export type Dependencias = {
   verificador: Verificador;
   /** undefined = usar Claude. */
   generador: Generador | undefined;
-  /** true si alguna es de fixture. Se guarda en la corrida. */
+  /** true si ALGUNA es de fixture. Se guarda en la corrida. */
   usaFixtures: boolean;
   faltantes: string[];
+  /**
+   * Qué partes salieron de fixture, con el nombre que entiende un empleado.
+   * Vacío = corrida enteramente real. Se guarda en `corridas.fixtures_en` para
+   * que la interfaz pueda decir QUÉ es inventado y no solo que algo lo es.
+   */
+  partesFixture: string[];
 };
 
 /**
  * Elige APIs reales o fixtures según las credenciales disponibles.
  *
- * Los fixtures se importan de forma dinámica: si mañana hay todas las llaves,
- * este módulo nunca los carga y no viajan al bundle de producción.
+ * ===========================================================================
+ * Se decide POR INTEGRACIÓN, no todo o nada
+ * ===========================================================================
+ *
+ * Antes bastaba con que faltara UNA llave para que las cuatro dependencias
+ * cayeran a fixture. Eso pareció razonable mientras no había ninguna llave,
+ * pero es exactamente lo que rompe el caso real: el 2026-08-02 llegaron las de
+ * Places y Anthropic, faltaban Apify y MillionVerifier, y el pipeline seguía
+ * inventando los negocios teniendo la llave de Places buena en el `.env`.
+ *
+ * Ahora cada integración mira solo su propia llave. Con Places y Claude puestas,
+ * los negocios son reales de Google Maps y los correos los escribe Claude de
+ * verdad; solo la verificación de entregabilidad queda simulada.
+ *
+ * ===========================================================================
+ * El fetch de sitios NO depende de una llave: depende de si los negocios son
+ * reales
+ * ===========================================================================
+ *
+ * `APIFY_TOKEN` no gobierna nada. Se planeó Apify para los sitios que bloquean
+ * un cliente HTTP común, pero eso nunca se implementó: `contactoService` baja
+ * la web con un `fetch` normal, sin credenciales. Gatearlo por `APIFY_TOKEN`
+ * hacía que la primera corrida con Places real trajera 60 negocios de verdad y
+ * cero correos — el fixture de sitios solo conoce las 7 webs inventadas.
+ *
+ * Lo que de verdad acopla al fetch es el ORIGEN DE LOS NEGOCIOS. Los negocios
+ * de fixture tienen URLs que no existen, así que bajarlas de verdad no
+ * devolvería nada; y los negocios reales tienen webs reales, que hay que bajar
+ * de verdad. Por eso `traer` sigue a `lector` y no a una variable de entorno.
+ *
+ * ===========================================================================
+ *
+ * La corrida se sigue marcando con `con_fixtures = true` si CUALQUIER parte es
+ * inventada — mezclar datos reales con datos falsos es más peligroso que tener
+ * todo falso, no menos, porque el negocio real le da credibilidad al email
+ * inventado. Por eso además se guarda QUÉ parte lo es.
+ *
+ * Los fixtures se importan de forma dinámica: la parte que tenga llave real
+ * nunca carga su fixture, y con las llaves puestas no viaja ninguno al bundle.
  */
 export async function dependenciasAutomaticas(): Promise<Dependencias> {
+  const hayPlaces = opcional('GOOGLE_PLACES_API_KEY') !== undefined;
+  const hayClaude = opcional('ANTHROPIC_API_KEY') !== undefined;
+  const hayVerificador = opcional('MILLIONVERIFIER_API_KEY') !== undefined;
+
   const faltantes: string[] = [];
-  if (opcional('GOOGLE_PLACES_API_KEY') === undefined) faltantes.push('GOOGLE_PLACES_API_KEY');
-  if (opcional('ANTHROPIC_API_KEY') === undefined) faltantes.push('ANTHROPIC_API_KEY');
-  if (opcional('MILLIONVERIFIER_API_KEY') === undefined) faltantes.push('MILLIONVERIFIER_API_KEY');
-  if (opcional('APIFY_TOKEN') === undefined) faltantes.push('APIFY_TOKEN');
+  if (!hayPlaces) faltantes.push('GOOGLE_PLACES_API_KEY');
+  if (!hayClaude) faltantes.push('ANTHROPIC_API_KEY');
+  if (!hayVerificador) faltantes.push('MILLIONVERIFIER_API_KEY');
 
-  if (faltantes.length === 0) {
-    return {
-      lector: (p) => buscarTexto(p),
-      traer: undefined, // contactoService usa su `fetch` real
-      verificador: verificarEmail,
-      generador: undefined, // redaccionService usa Claude
-      usaFixtures: false,
-      faltantes,
-    };
-  }
+  const partesFixture: string[] = [];
+  // Un solo item para negocios + webs: son la misma decisión, y al empleado le
+  // da igual que por dentro sean dos módulos.
+  if (!hayPlaces) partesFixture.push('los negocios y sus sitios web');
+  if (!hayVerificador) partesFixture.push('la verificación de entregabilidad');
+  if (!hayClaude) partesFixture.push('la redacción de los correos');
 
-  const [places, sitios, verif, borr] = await Promise.all([
-    import('../fixtures/places-restaurantes-panama.ts'),
-    import('../fixtures/sitios-web-panama.ts'),
-    import('../fixtures/verificaciones.ts'),
-    import('../fixtures/borradores.ts'),
-  ]);
+  // Cada import es dinámico y condicional: solo se carga el fixture que hace
+  // falta. `undefined` significa «usá la implementación real del servicio».
+  const lector: Lector = hayPlaces
+    ? (p) => buscarTexto(p)
+    : (await import('../fixtures/places-restaurantes-panama.ts')).lectorDeFixture();
+
+  const traer: Traer | undefined = hayPlaces
+    ? undefined // negocios reales -> bajar sus webs de verdad, con `fetch`
+    : (await import('../fixtures/sitios-web-panama.ts')).traerDeFixture();
+
+  const verificador: Verificador = hayVerificador
+    ? verificarEmail
+    : (await import('../fixtures/verificaciones.ts')).verificadorDeFixture();
+
+  const generador: Generador | undefined = hayClaude
+    ? undefined // redaccionService usa Claude
+    : (await import('../fixtures/borradores.ts')).generadorDeFixture();
 
   return {
-    lector: places.lectorDeFixture(),
-    traer: sitios.traerDeFixture(),
-    verificador: verif.verificadorDeFixture(),
-    generador: borr.generadorDeFixture(),
-    usaFixtures: true,
+    lector,
+    traer,
+    verificador,
+    generador,
+    usaFixtures: partesFixture.length > 0,
     faltantes,
+    partesFixture,
   };
 }
 
@@ -265,10 +319,16 @@ export async function tick(): Promise<{
 
   const deps = await dependenciasAutomaticas();
 
-  if (deps.usaFixtures && !corrida.con_fixtures) {
-    await poolPostgres().query(`update corridas set con_fixtures = true where id = $1`, [
-      corrida.id,
-    ]);
+  // Se guarda también QUÉ parte es inventada, no solo que algo lo es: desde que
+  // hay llaves para unas integraciones y no para otras, una corrida puede tener
+  // negocios reales con correos falsos, y el aviso tiene que poder decir cuál
+  // es cuál. Se reescribe en cada paso porque un paso posterior puede caer a
+  // fixture aunque el anterior haya sido real.
+  if (deps.usaFixtures) {
+    await poolPostgres().query(
+      `update corridas set con_fixtures = true, fixtures_en = $2 where id = $1`,
+      [corrida.id, deps.partesFixture],
+    );
   }
 
   try {

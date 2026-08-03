@@ -9,6 +9,12 @@ import { Embudo } from '../../componentes/Embudo.tsx';
 
 export const dynamic = 'force-dynamic';
 
+/** «a, b y c» — para que el aviso se lea como una frase y no como una lista. */
+function listar(partes: string[]): string {
+  if (partes.length <= 1) return partes[0] ?? '';
+  return `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}`;
+}
+
 export default async function DetalleCorrida({
   params,
 }: {
@@ -51,13 +57,28 @@ export default async function DetalleCorrida({
         con datos falsos, tiene que decirlo. Un lead inventado se ve idéntico a
         uno real, y dentro de un mes nadie se va a acordar de cuál era cuál.
       */}
+      {/*
+        El aviso ahora dice QUÉ es inventado, no solo que algo lo es.
+        Con llaves para unas integraciones y no para otras, la corrida puede
+        traer negocios reales de Google Maps con correos de contacto inventados
+        — y eso es más peligroso que tener todo falso: el negocio real le presta
+        credibilidad al email que no existe.
+      */}
       {corrida.con_fixtures && (
         <div className="aviso aviso--alerta" style={{ marginBottom: 'var(--e5)' }}>
           <FlaskConical size={16} strokeWidth={2} />
           <div>
-            <strong>Datos sintéticos.</strong> Esta corrida usó negocios inventados porque
-            faltan credenciales de las APIs. Los leads que salgan de acá{' '}
-            <strong>no son negocios reales de Panamá</strong>.
+            <strong>Datos parcialmente sintéticos.</strong>{' '}
+            {corrida.fixtures_en.length > 0 ? (
+              <>
+                En esta corrida <strong>{listar(corrida.fixtures_en)}</strong>{' '}
+                {corrida.fixtures_en.length === 1 ? 'es inventado' : 'son inventados'}, porque
+                faltan esas credenciales. El resto es real.
+              </>
+            ) : (
+              <>Esta corrida usó datos inventados por falta de credenciales.</>
+            )}{' '}
+            No aprobar nada de acá como si fuera un contacto verificado.
           </div>
         </div>
       )}
