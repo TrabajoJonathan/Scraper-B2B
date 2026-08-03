@@ -2,10 +2,30 @@ import { tick } from '../../../src/servicios/pipelineService.ts';
 import { opcional } from '../../../src/core/config.ts';
 
 /**
- * El cron. Vercel Cron le pega a esta ruta cada minuto.
+ * El cron: cada invocación avanza UNA corrida UN paso. No corre el pipeline
+ * completo porque no cabría en el límite de tiempo de una función.
  *
- * Cada invocación avanza UNA corrida UN paso. No corre el pipeline completo: no
- * cabría en el límite de tiempo de una función.
+ * ===========================================================================
+ * OJO: hoy NADIE llama a esta ruta automáticamente
+ * ===========================================================================
+ *
+ * `vercel.json` ya NO declara el cron. Decisión del jefe (reunión del 2026-08-01):
+ * el plan Hobby de Vercel limita los cron a una vez por día, y un paso por día
+ * no sirve para un pipeline de seis pasos. Pagar Pro no está en el presupuesto
+ * todavía.
+ *
+ * Así que el pipeline avanza de dos maneras:
+ *   · en local, con `npm run cron` (pega a la MISMA base de Supabase, así que
+ *     también hace avanzar las corridas creadas desde la web desplegada);
+ *   · a mano, llamando esta ruta con el header `Authorization: Bearer $CRON_SECRET`.
+ *
+ * La ruta se queda tal cual, funcionando y protegida: cuando pasen a Pro, es
+ * volver a poner el bloque `crons` en `vercel.json` y nada más. No hay que
+ * reescribir nada.
+ *
+ * Vercel manda `Authorization: Bearer $CRON_SECRET` en sus invocaciones, y esta
+ * ruta lo sigue exigiendo — el hecho de que no haya cron programado no la deja
+ * abierta.
  *
  * ===========================================================================
  * SEGURIDAD: esta ruta NO puede ser pública

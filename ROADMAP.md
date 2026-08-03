@@ -604,8 +604,16 @@ Cron que avanza las corridas **un paso por invocación**.
 - [x] `ejecutarPaso()` — un paso por llamada, para caber en el límite de Vercel
 - [x] El paso de contacto va **por lotes** (12 sitios) con **concurrencia** (6 en paralelo)
 - [x] Ruta `/api/cron` protegida con `CRON_SECRET`, **falla cerrado** si falta
-- [x] `vercel.json` con el cron cada minuto
 - [x] `npm run cron` — runner local con intervalo de 2s, para la demo
+- [ ] ~~`vercel.json` con el cron cada minuto~~ — **desactivado por decisión del jefe
+  (reunión 2026-08-01).** El plan Hobby de Vercel limita los cron a **una vez por
+  día**, y un paso por día no sirve para un pipeline de seis pasos. Pro no está en
+  el presupuesto todavía.
+  **Mientras tanto** el pipeline avanza con `npm run cron` en local, que pega a la
+  misma base de Supabase y por lo tanto también hace avanzar las corridas creadas
+  desde la web desplegada.
+  **Para reactivarlo** cuando pasen a Pro: volver a poner el bloque `crons` en
+  `vercel.json`. La ruta se quedó intacta y protegida, no hay que tocar código.
 - [x] Elige APIs reales o fixtures **según haya credenciales**, y marca la corrida
 - [x] Un fallo deja la corrida en `fallida` con el mensaje **visible en la interfaz**
 - [x] El humano sigue revisando en el panel; **el envío nunca se automatiza**
