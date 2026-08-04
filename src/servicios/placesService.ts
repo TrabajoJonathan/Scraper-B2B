@@ -198,4 +198,12 @@ export const ZONAS_CIUDAD_PANAMA = [
   'San Francisco, Ciudad de Panamá',
   'Casco Antiguo, Ciudad de Panamá',
   'Marbella, Ciudad de Panamá',
+  'Paitilla, Ciudad de Panamá',
+  'Coco del Mar, Ciudad de Panamá',
+  'Betania, Ciudad de Panamá',
+  'Parque Lefevre, Ciudad de Panamá',
+  'El Dorado, Ciudad de Panamá',
+  'Juan Díaz, Ciudad de Panamá',
+  'Tocumen, Ciudad de Panamá',
+  'Cerro Viento, La Chorrera',
 ] as const;

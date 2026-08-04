@@ -5,7 +5,17 @@ import { Search } from 'lucide-react';
 import { accionCrearCorrida, type EstadoAccion } from '../../lib/acciones.ts';
 
 /**
- * Zonas sugeridas de Ciudad de Panamá.
+ * Zonas sugeridas de Ciudad de Panamá — son AUTOCOMPLETADO, no una lista
+ * cerrada. El campo de abajo es texto libre (`type="text"`, el `<datalist>`
+ * solo ofrece sugerencias): siempre aceptó cualquier zona escrita a mano,
+ * incluso antes de esta lista. Lo único que cambió acá es agregar más
+ * sugerencias y decirlo explícitamente, para que se note.
+ *
+ * Se evaluó un autocompletado en vivo estilo Google Maps (Places Autocomplete)
+ * y se descartó: es una API DISTINTA de la que ya usamos (Text Search), con
+ * cobro propio, y necesitaría exponer la llave en el navegador o un endpoint
+ * propio cobrando por cada tecla. Esta lista local es gratis y cubre el mismo
+ * caso de uso — sugerir mientras escribís — sin ese costo.
  *
  * Espejo de `ZONAS_CIUDAD_PANAMA` en placesService. No se importa desde ahí a
  * propósito: ese módulo arrastra el cliente de Places (y por lo tanto `pg` y las
@@ -21,6 +31,14 @@ const ZONAS = [
   'San Francisco, Ciudad de Panamá',
   'Casco Antiguo, Ciudad de Panamá',
   'Marbella, Ciudad de Panamá',
+  'Paitilla, Ciudad de Panamá',
+  'Coco del Mar, Ciudad de Panamá',
+  'Betania, Ciudad de Panamá',
+  'Parque Lefevre, Ciudad de Panamá',
+  'El Dorado, Ciudad de Panamá',
+  'Juan Díaz, Ciudad de Panamá',
+  'Tocumen, Ciudad de Panamá',
+  'Cerro Viento, La Chorrera',
 ];
 
 export function FormularioBusqueda() {
@@ -61,12 +79,15 @@ export function FormularioBusqueda() {
             name="ubicacion"
             type="text"
             list="zonas"
-            placeholder="Bella Vista, Ciudad de Panamá"
+            placeholder="Cualquier zona de Panamá (ej. Tocumen, Cerro Viento, El Dorado…)"
             required
           />
           <datalist id="zonas">
             {ZONAS.map((z) => <option key={z} value={z} />)}
           </datalist>
+          <p className="tenue" style={{ fontSize: 'var(--t-micro)', marginTop: 'var(--e1)' }}>
+            No hace falta que esté en la lista — escribí cualquier zona y listo.
+          </p>
         </div>
       </div>
 
