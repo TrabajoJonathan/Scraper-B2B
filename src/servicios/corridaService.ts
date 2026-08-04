@@ -1,26 +1,53 @@
 /**
  * corridaService — encargar y seguir el trabajo (Fase 6).
  *
- * Capa: servicios. Lo llaman tanto las rutas de la app como el cron.
+ * Capa: servicios. Lo llama la app (creación, seguimiento) y `pipelineService`
+ * (avance).
  *
  * ===========================================================================
  * Por qué existe: el pipeline NO cabe en una petición de Vercel
  * ===========================================================================
  *
- * Una corrida completa tarda minutos; una función serverless se corta en
- * decenas de segundos. Así que se parte en dos responsabilidades:
+ * Una corrida completa tarda más que el límite de una función. Así que se
+ * parte en dos responsabilidades:
  *
- *   `crearCorrida()`   ← lo llama el botón "Buscar". Registra y responde YA.
- *   `avanzarCorrida()` ← lo llama el cron. Hace UN paso y devuelve el control.
+ *   `crearCorrida()`      ← lo llama el botón "Buscar". Registra y responde YA.
+ *   `tomarCorridaPorId()` ← lo llama `pipelineService` con UN paso por vez.
  *
- * Cada paso tiene que caber solo en el límite de una función. Por eso el cron
- * avanza de a uno en vez de correr el pipeline entero.
+ * Cada paso tiene que caber solo en el límite de una función. Por eso se
+ * avanza de a uno en vez de correr el pipeline entero de un tirón.
+ *
+ * ===========================================================================
+ * `PASOS` se achicó de 6 a 4 (2026-08-04)
+ * ===========================================================================
+ *
+ * Decisión de negocio: no se va a pagar MillionVerifier por ahora, y la
+ * redacción automática para todos deja de tener sentido sin verificación real
+ * (redactar quedaba gateado por `estado_verificacion = 'verificado'`, un
+ * estado que ya nunca se alcanza). Se sacaron `verificar` y `redactar` del
+ * avance automático:
+ *
+ *   - `verificar` desaparece del todo: no hay nada que llamar sin la llave, y
+ *     simularlo con el fixture sobre negocios REALES fabricaría un veredicto
+ *     de verificación que nunca pasó. `verificarService.ts` se queda intacto
+ *     por si el día de mañana se paga la llave — solo deja de estar en el
+ *     camino automático.
+ *   - `redactar` se separa del pipeline: pasa a ser una acción disparada por
+ *     selección humana desde `/leads` (ver `revisionService`/`redaccionService`
+ *     y el botón "Generar borradores"), no un paso que `ejecutarPaso()` corre
+ *     solo. Puede juntar leads de varias corridas a la vez, así que no tiene
+ *     sentido que viva colgado del `paso` de una corrida en particular.
+ *
+ * Una corrida automática hoy llega hasta `priorizar` y ahí se da por
+ * `completada` — con los leads puntuados, sin borrador. Ese es el trabajo
+ * completo que el sistema hace sin que nadie decida nada.
  */
 
 import { enTransaccion, poolPostgres } from '../core/postgres.ts';
+import type pg from 'pg';
 import type { SearchSpec } from '../dominio/tipos.ts';
 
-export const PASOS = ['descubrir', 'contacto', 'verificar', 'priorizar', 'redactar', 'listo'] as const;
+export const PASOS = ['descubrir', 'contacto', 'priorizar', 'listo'] as const;
 export type Paso = (typeof PASOS)[number];
 
 export const ESTADOS_CORRIDA = ['pendiente', 'corriendo', 'completada', 'fallida', 'cancelada'] as const;
@@ -152,10 +179,10 @@ export async function terminarCorrida(
 /**
  * Toma la corrida pendiente más vieja y la marca como corriendo.
  *
- * `for update skip locked` es lo que hace esto seguro con varios workers: si dos
- * invocaciones del cron se solapan, la segunda SALTA la fila que la primera ya
- * tomó en vez de esperarla. Sin `skip locked`, dos crons harían el mismo trabajo
- * dos veces o se bloquearían mutuamente.
+ * `for update skip locked` es lo que hace esto seguro con varios invocadores a
+ * la vez: si dos se solapan, la segunda SALTA la fila que la primera ya tomó
+ * en vez de esperarla o pisarla. Sin `skip locked`, harían el mismo trabajo dos
+ * veces o se bloquearían mutuamente.
  */
 export async function tomarSiguienteCorrida(): Promise<Corrida | null> {
   return enTransaccion(async (c) => {
@@ -167,21 +194,50 @@ export async function tomarSiguienteCorrida(): Promise<Corrida | null> {
        for update skip locked`,
     );
     if (rows.length === 0) return null;
-
-    await c.query(
-      `update corridas set estado = 'corriendo', iniciada_en = coalesce(iniciada_en, now())
-       where id = $1`,
-      [rows[0]!.id],
-    );
-
-    const { rows: full } = await c.query<Corrida>(
-      `select co.*, b.producto, b.categoria, b.ubicacion
-       from corridas co join busquedas b on b.id = co.busqueda_id
-       where co.id = $1`,
-      [rows[0]!.id],
-    );
-    return full[0] ?? null;
+    return marcarCorriendoYCargar(c, rows[0]!.id);
   });
+}
+
+/**
+ * Toma UNA corrida específica y la marca como corriendo, si está en un estado
+ * avanzable.
+ *
+ * A diferencia de `tomarSiguienteCorrida()` —pensada para un solo invocador
+ * (el cron) que procesa la cola global en orden— esta la usa cada pantalla de
+ * detalle: quien dispara el avance es un empleado mirando ESA corrida, y tiene
+ * que avanzar esa, no la que resulte ser la más vieja de todas.
+ *
+ * Mismo `for update skip locked`: si el empleado tiene dos pestañas abiertas
+ * con la misma corrida, la segunda simplemente no encuentra nada que tomar (la
+ * primera ya se la llevó) en vez de pisarla o duplicar el trabajo.
+ */
+export async function tomarCorridaPorId(id: string): Promise<Corrida | null> {
+  return enTransaccion(async (c) => {
+    const { rows } = await c.query<{ id: string }>(
+      `select id from corridas
+       where id = $1 and estado in ('pendiente', 'corriendo')
+       limit 1
+       for update skip locked`,
+      [id],
+    );
+    if (rows.length === 0) return null;
+    return marcarCorriendoYCargar(c, rows[0]!.id);
+  });
+}
+
+async function marcarCorriendoYCargar(c: pg.PoolClient, id: string): Promise<Corrida | null> {
+  await c.query(
+    `update corridas set estado = 'corriendo', iniciada_en = coalesce(iniciada_en, now())
+     where id = $1`,
+    [id],
+  );
+  const { rows: full } = await c.query<Corrida>(
+    `select co.*, b.producto, b.categoria, b.ubicacion
+     from corridas co join busquedas b on b.id = co.busqueda_id
+     where co.id = $1`,
+    [id],
+  );
+  return full[0] ?? null;
 }
 
 /** Contadores para el tablero. Una consulta, no cinco. */

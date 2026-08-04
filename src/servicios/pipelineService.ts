@@ -5,13 +5,14 @@
  * La restricción que define este archivo
  * ===========================================================================
  *
- * Una corrida completa tarda minutos; una función de Vercel se corta en decenas
- * de segundos. Así que `ejecutarPaso()` hace **un solo paso** y devuelve el
- * control. El cron lo llama cada minuto hasta que la corrida llega a `listo`.
+ * Una corrida completa tarda más que el límite de una función. Así que
+ * `ejecutarPaso()` hace **un solo paso** y devuelve el control. Quien la llame
+ * —hoy, la pantalla de detalle mientras está abierta; antes, un cron— la va
+ * llamando de nuevo hasta que la corrida llega a `listo`.
  *
- * El paso de contacto —el lento, porque baja 60 sitios— además se procesa **por
- * lotes**: N sitios por invocación, con concurrencia. Así ninguna invocación se
- * pasa del límite, sin importar cuántos negocios haya.
+ * El paso de contacto —el lento, porque baja sitios web reales— además se
+ * procesa **por lotes**: N sitios por invocación, con concurrencia. Así
+ * ninguna invocación se pasa del límite, sin importar cuántos negocios haya.
  *
  * ===========================================================================
  * Dependencias inyectadas, y por qué eso importa acá
@@ -21,6 +22,12 @@
  * mostrar el sistema funcionando sin llaves — pero la corrida queda **marcada**
  * con `con_fixtures = true`, porque un lead inventado se ve idéntico a uno real
  * y dentro de un mes nadie se acordaría.
+ *
+ * `verificador` no está entre las dependencias: sin MillionVerifier (decisión
+ * de negocio, no una llave que falte "todavía"), no hay nada real que llamar,
+ * y simularlo con un fixture sobre negocios REALES fabricaría un veredicto de
+ * verificación que nunca pasó. Ver el comentario de `PASOS` en
+ * `corridaService.ts`.
  */
 
 import { buscar, ZONAS_CIUDAD_PANAMA, type Lector } from './placesService.ts';
@@ -28,14 +35,14 @@ import { extraerContacto, type Traer } from './contactoService.ts';
 import {
   guardarDescubrimiento, registrarContacto, pendientesDeContacto, marcarSinWeb,
 } from './negocioService.ts';
-import { verificarPendientes } from './verificarService.ts';
 import { priorizar, guardarSenalesWeb } from './scoringService.ts';
-import { generarBorradores, type Generador } from './redaccionService.ts';
-import { actualizarProgreso, terminarCorrida, type Corrida, type Paso } from './corridaService.ts';
+import {
+  actualizarProgreso, terminarCorrida, tomarSiguienteCorrida, tomarCorridaPorId,
+  type Corrida, type Paso,
+} from './corridaService.ts';
 import { poolPostgres } from '../core/postgres.ts';
 import { opcional } from '../core/config.ts';
 import { buscarTexto } from '../core/places.ts';
-import { verificarEmail, type Verificador } from '../core/millionverifier.ts';
 import type { SearchSpec } from '../dominio/tipos.ts';
 
 /** Sitios que se bajan por invocación. Bajo a propósito: cada uno tarda hasta 8s. */
@@ -47,9 +54,6 @@ export type Dependencias = {
   lector: Lector;
   /** undefined = usar el `fetch` real de contactoService. */
   traer: Traer | undefined;
-  verificador: Verificador;
-  /** undefined = usar Claude. */
-  generador: Generador | undefined;
   /** true si ALGUNA es de fixture. Se guarda en la corrida. */
   usaFixtures: boolean;
   faltantes: string[];
@@ -62,67 +66,51 @@ export type Dependencias = {
 };
 
 /**
- * Elige APIs reales o fixtures según las credenciales disponibles.
+ * Elige APIs reales o fixtures según las credenciales disponibles, para las
+ * integraciones que el avance AUTOMÁTICO de una corrida usa: descubrir
+ * negocios y bajar sus sitios. `verificador` y `generador` no están acá — ver
+ * el comentario grande sobre `PASOS` en `corridaService.ts` para el por qué.
  *
  * ===========================================================================
  * Se decide POR INTEGRACIÓN, no todo o nada
  * ===========================================================================
  *
- * Antes bastaba con que faltara UNA llave para que las cuatro dependencias
- * cayeran a fixture. Eso pareció razonable mientras no había ninguna llave,
- * pero es exactamente lo que rompe el caso real: el 2026-08-02 llegaron las de
- * Places y Anthropic, faltaban Apify y MillionVerifier, y el pipeline seguía
- * inventando los negocios teniendo la llave de Places buena en el `.env`.
- *
- * Ahora cada integración mira solo su propia llave. Con Places y Claude puestas,
- * los negocios son reales de Google Maps y los correos los escribe Claude de
- * verdad; solo la verificación de entregabilidad queda simulada.
+ * Antes bastaba con que faltara UNA llave para que todo cayera a fixture. Eso
+ * pareció razonable mientras no había ninguna llave, pero es exactamente lo
+ * que rompió el caso real del 2026-08-02: llegaron Places y Anthropic, y el
+ * pipeline seguía inventando negocios por faltar otra llave sin relación.
  *
  * ===========================================================================
  * El fetch de sitios NO depende de una llave: depende de si los negocios son
  * reales
  * ===========================================================================
  *
- * `APIFY_TOKEN` no gobierna nada. Se planeó Apify para los sitios que bloquean
- * un cliente HTTP común, pero eso nunca se implementó: `contactoService` baja
- * la web con un `fetch` normal, sin credenciales. Gatearlo por `APIFY_TOKEN`
- * hacía que la primera corrida con Places real trajera 60 negocios de verdad y
- * cero correos — el fixture de sitios solo conoce las 7 webs inventadas.
- *
  * Lo que de verdad acopla al fetch es el ORIGEN DE LOS NEGOCIOS. Los negocios
  * de fixture tienen URLs que no existen, así que bajarlas de verdad no
  * devolvería nada; y los negocios reales tienen webs reales, que hay que bajar
- * de verdad. Por eso `traer` sigue a `lector` y no a una variable de entorno.
+ * de verdad. Por eso `traer` sigue a `lector`.
  *
  * ===========================================================================
  *
  * La corrida se sigue marcando con `con_fixtures = true` si CUALQUIER parte es
  * inventada — mezclar datos reales con datos falsos es más peligroso que tener
- * todo falso, no menos, porque el negocio real le da credibilidad al email
- * inventado. Por eso además se guarda QUÉ parte lo es.
+ * todo falso, no menos, porque el negocio real le da credibilidad al dato
+ * falso. Por eso además se guarda QUÉ parte lo es.
  *
- * Los fixtures se importan de forma dinámica: la parte que tenga llave real
- * nunca carga su fixture, y con las llaves puestas no viaja ninguno al bundle.
+ * Los fixtures se importan de forma dinámica: con las llaves puestas, ninguno
+ * viaja al bundle.
  */
 export async function dependenciasAutomaticas(): Promise<Dependencias> {
   const hayPlaces = opcional('GOOGLE_PLACES_API_KEY') !== undefined;
-  const hayClaude = opcional('ANTHROPIC_API_KEY') !== undefined;
-  const hayVerificador = opcional('MILLIONVERIFIER_API_KEY') !== undefined;
 
   const faltantes: string[] = [];
   if (!hayPlaces) faltantes.push('GOOGLE_PLACES_API_KEY');
-  if (!hayClaude) faltantes.push('ANTHROPIC_API_KEY');
-  if (!hayVerificador) faltantes.push('MILLIONVERIFIER_API_KEY');
 
   const partesFixture: string[] = [];
   // Un solo item para negocios + webs: son la misma decisión, y al empleado le
   // da igual que por dentro sean dos módulos.
   if (!hayPlaces) partesFixture.push('los negocios y sus sitios web');
-  if (!hayVerificador) partesFixture.push('la verificación de entregabilidad');
-  if (!hayClaude) partesFixture.push('la redacción de los correos');
 
-  // Cada import es dinámico y condicional: solo se carga el fixture que hace
-  // falta. `undefined` significa «usá la implementación real del servicio».
   const lector: Lector = hayPlaces
     ? (p) => buscarTexto(p)
     : (await import('../fixtures/places-restaurantes-panama.ts')).lectorDeFixture();
@@ -131,19 +119,9 @@ export async function dependenciasAutomaticas(): Promise<Dependencias> {
     ? undefined // negocios reales -> bajar sus webs de verdad, con `fetch`
     : (await import('../fixtures/sitios-web-panama.ts')).traerDeFixture();
 
-  const verificador: Verificador = hayVerificador
-    ? verificarEmail
-    : (await import('../fixtures/verificaciones.ts')).verificadorDeFixture();
-
-  const generador: Generador | undefined = hayClaude
-    ? undefined // redaccionService usa Claude
-    : (await import('../fixtures/borradores.ts')).generadorDeFixture();
-
   return {
     lector,
     traer,
-    verificador,
-    generador,
     usaFixtures: partesFixture.length > 0,
     faltantes,
     partesFixture,
@@ -219,12 +197,14 @@ export async function ejecutarPaso(
 
       if (lote.length === 0) {
         // No queda nadie con web sin revisar: cerrar a los que no tienen web
-        // (si no, se quedan varados) y pasar al siguiente paso.
+        // (si no, se quedan varados) y pasar directo a priorizar. Ya no hay
+        // paso "verificar" en el medio — ver el comentario sobre PASOS en
+        // corridaService.ts.
         const varados = await marcarSinWeb(bid);
-        await actualizarProgreso(corrida.id, { paso: 'verificar' });
+        await actualizarProgreso(corrida.id, { paso: 'priorizar' });
         return {
           ...base,
-          pasoSiguiente: 'verificar',
+          pasoSiguiente: 'priorizar',
           detalle: `contacto terminado · ${varados} sin web marcados`,
         };
       }
@@ -257,38 +237,17 @@ export async function ejecutarPaso(
     }
 
     // -----------------------------------------------------------------------
-    case 'verificar': {
-      const v = await verificarPendientes(bid, { verificador: deps.verificador });
-      await actualizarProgreso(corrida.id, { paso: 'priorizar' });
-      return {
-        ...base,
-        pasoSiguiente: 'priorizar',
-        detalle: `${v.llamadas} llamadas · ${v.filasActualizadas} filas · ${v.llamadasAhorradas} ahorradas · $${v.costoUSD.toFixed(4)}`,
-      };
-    }
-
-    // -----------------------------------------------------------------------
+    // Último paso automático. Antes seguía a "redactar"; ya no: sin
+    // verificación real, redactar para todos ya no tiene sentido, y pasa a
+    // ser una acción manual desde /leads (ver corridaService.ts, PASOS).
     case 'priorizar': {
       const p = await priorizar(bid);
-      await actualizarProgreso(corrida.id, { paso: 'redactar' });
-      return {
-        ...base,
-        pasoSiguiente: 'redactar',
-        detalle: `${p.conScore} con score · promedio ${p.scorePromedio} · ${p.filtrados} sin canal`,
-      };
-    }
-
-    // -----------------------------------------------------------------------
-    case 'redactar': {
-      const g = await generarBorradores(bid, {
-        ...(deps.generador === undefined ? {} : { generador: deps.generador }),
-      });
       await terminarCorrida(corrida.id, { ok: true });
       return {
         ...base,
         pasoSiguiente: 'listo',
         termino: true,
-        detalle: `${g.generados} borradores · ${g.omitidosPorBuzonCompartido} omitidos por buzón compartido · $${g.costoUSD.toFixed(4)}`,
+        detalle: `${p.conScore} con score · promedio ${p.scorePromedio} · ${p.filtrados} sin canal`,
       };
     }
 
@@ -299,31 +258,32 @@ export async function ejecutarPaso(
   }
 }
 
-/**
- * Una invocación del cron: toma una corrida y le da un paso.
- *
- * Si algo revienta, la corrida queda en `fallida` con el mensaje guardado — que
- * es lo que hace que el fallo sea VISIBLE en la interfaz en vez de morir en un
- * log. Sin esto, una corrida rota se quedaría en "buscando" para siempre y nadie
- * sabría por qué.
- */
-export async function tick(): Promise<{
+export type ResultadoAvance = {
   hizoAlgo: boolean;
   resultado?: ResultadoPaso;
   error?: string;
   usaFixtures?: boolean;
-}> {
-  const { tomarSiguienteCorrida } = await import('./corridaService.ts');
-  const corrida = await tomarSiguienteCorrida();
-  if (corrida === null) return { hizoAlgo: false };
+};
 
+/**
+ * Resuelve dependencias, marca fixtures y corre el paso — para una corrida ya
+ * tomada (bloqueada con `for update`). Común a `tick()` y a
+ * `avanzarCorridaEspecifica()`; lo único que cambia entre esas dos es CÓMO se
+ * elige la corrida, no qué se hace una vez elegida.
+ *
+ * Si algo revienta, la corrida queda en `fallida` con el mensaje guardado — que
+ * es lo que hace que el fallo sea VISIBLE en la interfaz en vez de morir en un
+ * log. Sin esto, una corrida rota se quedaría en "buscando" para siempre y
+ * nadie sabría por qué.
+ */
+async function avanzarCorridaTomada(corrida: Corrida): Promise<ResultadoAvance> {
   const deps = await dependenciasAutomaticas();
 
-  // Se guarda también QUÉ parte es inventada, no solo que algo lo es: desde que
-  // hay llaves para unas integraciones y no para otras, una corrida puede tener
-  // negocios reales con correos falsos, y el aviso tiene que poder decir cuál
-  // es cuál. Se reescribe en cada paso porque un paso posterior puede caer a
-  // fixture aunque el anterior haya sido real.
+  // Se guarda también QUÉ parte es inventada, no solo que algo lo es: un
+  // negocio real puede convivir con una web de fixture si a mitad de camino
+  // se acaba la llave, y el aviso tiene que poder decir cuál es cuál. Se
+  // reescribe en cada paso porque un paso posterior puede caer a fixture
+  // aunque el anterior haya sido real.
   if (deps.usaFixtures) {
     await poolPostgres().query(
       `update corridas set con_fixtures = true, fixtures_en = $2 where id = $1`,
@@ -339,6 +299,30 @@ export async function tick(): Promise<{
     await terminarCorrida(corrida.id, { ok: false, error: mensaje });
     return { hizoAlgo: true, error: mensaje, usaFixtures: deps.usaFixtures };
   }
+}
+
+/**
+ * Toma la corrida pendiente más vieja de TODAS y le da un paso.
+ *
+ * Uso: `npm run cron` — un único invocador que vacía la cola en orden. No es
+ * lo que usa la pantalla de detalle (ver `avanzarCorridaEspecifica`): con
+ * varias corridas pendientes a la vez, esto podría avanzar una distinta a la
+ * que el empleado está mirando.
+ */
+export async function tick(): Promise<ResultadoAvance> {
+  const corrida = await tomarSiguienteCorrida();
+  if (corrida === null) return { hizoAlgo: false };
+  return avanzarCorridaTomada(corrida);
+}
+
+/**
+ * Le da un paso a UNA corrida puntual. Es lo que llama la ruta que la pantalla
+ * de detalle va sondeando mientras está abierta (ver `Avanzador.tsx`).
+ */
+export async function avanzarCorridaEspecifica(id: string): Promise<ResultadoAvance> {
+  const corrida = await tomarCorridaPorId(id);
+  if (corrida === null) return { hizoAlgo: false };
+  return avanzarCorridaTomada(corrida);
 }
 
 export { ZONAS_CIUDAD_PANAMA };

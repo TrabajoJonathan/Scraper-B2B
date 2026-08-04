@@ -93,19 +93,30 @@ try {
     await marcarSinWeb(busquedaId);
     console.log(`  contacto   → ${n} sitios revisados`);
 
-    await actualizarProgreso(corridaId, { paso: 'verificar' });
-    const v = await verificarPendientes(busquedaId, { verificador: verificadorDeFixture() });
-    console.log(`  verificar  → ${v.llamadas} llamadas, ${v.filasActualizadas} filas`);
-
     await actualizarProgreso(corridaId, { paso: 'priorizar' });
     const pr = await priorizar(busquedaId, { anioActual: ANIO });
     console.log(`  priorizar  → ${pr.conScore} con score, promedio ${pr.scorePromedio}`);
 
-    await actualizarProgreso(corridaId, { paso: 'redactar' });
+    await terminarCorrida(corridaId, { ok: true });
+
+    /*
+     * Verificar y redactar ya NO son pasos del pipeline automático (decisión
+     * de negocio: sin MillionVerifier, y redactar pasa a ser una acción manual
+     * desde /leads — ver el comentario sobre PASOS en corridaService.ts). La
+     * corrida ya está `completada` en este punto, igual que va a quedar
+     * cualquier corrida real de acá en más.
+     *
+     * Para que la demo siga mostrando borradores en /revision mientras el
+     * botón "Generar borradores" no existe todavía, este script llama a los
+     * mismos servicios que ese botón va a llamar más adelante — la diferencia
+     * es que acá se dispara para todos los negocios de la demo, en vez de para
+     * una selección humana.
+     */
+    const v = await verificarPendientes(busquedaId, { verificador: verificadorDeFixture() });
+    console.log(`  verificar  → ${v.llamadas} llamadas, ${v.filasActualizadas} filas`);
+
     const g = await generarBorradores(busquedaId, { generador: generadorDeFixture() });
     console.log(`  redactar   → ${g.generados} borradores`);
-
-    await terminarCorrida(corridaId, { ok: true });
 
     console.log('\nListo. Levantá el panel con `npm run dev` y mirá:');
     console.log('  http://localhost:3000/            tablero');

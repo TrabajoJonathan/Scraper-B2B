@@ -427,6 +427,23 @@ h2, .seccion {
   transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/*
+ * Barra indeterminada: para "descubrir" antes de que se conozca el total.
+ * Un 0% fijo se ve idéntico a "esto está trabado" — este barrido en movimiento
+ * dice "está pasando algo" sin prometer un porcentaje que todavía no existe.
+ */
+.progreso--indeterminado .progreso__barra {
+  width: 40% !important;
+  animation: barrido 1.3s ease-in-out infinite;
+}
+@keyframes barrido {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progreso--indeterminado .progreso__barra { animation: none; width: 100%; opacity: 0.35; }
+}
+
 .pasos {
   display: flex;
   gap: var(--e4);

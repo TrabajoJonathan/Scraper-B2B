@@ -1,14 +1,22 @@
 /**
- * Corre el cron en bucle localmente. Para la demo y para desarrollo.
+ * Corre el pipeline en bucle localmente, sin abrir ninguna pantalla.
  *
  *   npm run cron
  *
- * En producción esto lo hace Vercel Cron pegándole a `/api/cron` cada minuto.
- * Acá el intervalo es de 2 segundos, porque esperar un minuto entre pasos
- * mientras mostrás algo en vivo es una eternidad.
+ * ===========================================================================
+ * Ya NO es el mecanismo principal (2026-08-04)
+ * ===========================================================================
  *
- * Se corta solo cuando no queda nada pendiente, así que se puede dejar corriendo
- * al lado de `npm run dev` y va a ir avanzando lo que aparezca.
+ * Desde que `/corridas/[id]` hace avanzar la corrida sola mientras está
+ * abierta (ver `Avanzador.tsx`), esto es una herramienta manual: sirve para
+ * hacer avanzar corridas SIN tener que abrir el navegador — por ejemplo, para
+ * dejar varias encargadas y procesarlas de una sentada, o para un script.
+ * Nada del uso normal de la herramienta depende de que esto esté corriendo.
+ *
+ * El intervalo es de 2 segundos, más rápido que cualquier uso real, para que
+ * verlo en la terminal no sea una espera eterna.
+ *
+ * Se corta solo cuando no queda nada pendiente.
  */
 
 import { tick, dependenciasAutomaticas } from '../servicios/pipelineService.ts';

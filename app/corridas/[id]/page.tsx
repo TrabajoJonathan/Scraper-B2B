@@ -6,6 +6,7 @@ import { conteoPorEstado } from '../../../src/servicios/panelService.ts';
 import { EstadoCorridaPildora } from '../../componentes/Pildoras.tsx';
 import { Pasos } from '../../componentes/Pasos.tsx';
 import { Embudo } from '../../componentes/Embudo.tsx';
+import { Avanzador } from './Avanzador.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,14 +34,24 @@ export default async function DetalleCorrida({
       ? Math.round((corrida.progreso_hecho / corrida.progreso_total) * 100)
       : Math.round((indiceActual / (PASOS.length - 1)) * 100);
 
+  /*
+   * "Descubrir" no tiene total todavía: no se sabe cuántos negocios hay hasta
+   * que Places responde. Antes eso se mostraba como una barra en 0%, que se ve
+   * idéntica a "esto está trabado" — el ícono de Pasos ya gira, pero la barra
+   * dice lo contrario. Mientras dura esto (unos segundos con Places real), se
+   * muestra un estado indeterminado en vez de un 0% que parece congelado.
+   */
+  const buscandoNegocios = corrida.paso === 'descubrir' && corrida.progreso_total === null;
+
   return (
     <>
       {/*
-        Recarga automática mientras el trabajo está en curso. Es la solución más
-        simple que funciona: sin websockets, sin estado en el cliente. Cuando la
-        corrida termina, el meta desaparece y la página deja de recargarse.
+        Esta pantalla ES lo que hace avanzar la corrida mientras está abierta:
+        ver Avanzador.tsx para el por qué (reemplaza al viejo meta-refresh, que
+        dependía de un cron que ya no existe y además se llevaba mal con la
+        navegación de cliente).
       */}
-      {enCurso && <meta httpEquiv="refresh" content="5" />}
+      {enCurso && <Avanzador corridaId={corrida.id} />}
 
       <div className="miga">
         <Link href="/corridas">Corridas</Link>
@@ -105,24 +116,36 @@ export default async function DetalleCorrida({
           <div className="grupo">
             <EstadoCorridaPildora estado={corrida.estado} />
             <span className="tenue" style={{ fontSize: 'var(--t-desc)' }}>
-              {corrida.progreso_total === null
-                ? `${corrida.progreso_hecho} procesados`
-                : `${corrida.progreso_hecho} de ${corrida.progreso_total}`}
+              {buscandoNegocios
+                ? 'Buscando negocios en Google Places…'
+                : corrida.progreso_total === null
+                  ? `${corrida.progreso_hecho} procesados`
+                  : `${corrida.progreso_hecho} de ${corrida.progreso_total}`}
             </span>
           </div>
-          <span className="mono tenue" style={{ fontSize: 'var(--t-desc)' }}>
-            {porcentaje}%
-          </span>
+          {/* Sin porcentaje mientras se busca: todavía no hay total contra qué medirlo. */}
+          {!buscandoNegocios && (
+            <span className="mono tenue" style={{ fontSize: 'var(--t-desc)' }}>
+              {porcentaje}%
+            </span>
+          )}
         </div>
 
         <div className="panel__cuerpo">
-          <div className="progreso" style={{ marginBottom: 'var(--e5)' }}>
+          <div
+            className={`progreso ${buscandoNegocios ? 'progreso--indeterminado' : ''}`}
+            style={{ marginBottom: 'var(--e5)' }}
+          >
             <div
               className="progreso__barra"
-              style={{
-                width: `${porcentaje}%`,
-                background: corrida.estado === 'fallida' ? 'var(--riesgo)' : undefined,
-              }}
+              style={
+                buscandoNegocios
+                  ? undefined // el ancho lo maneja la animación CSS, no el inline style
+                  : {
+                      width: `${porcentaje}%`,
+                      background: corrida.estado === 'fallida' ? 'var(--riesgo)' : undefined,
+                    }
+              }
             />
           </div>
 
@@ -133,9 +156,9 @@ export default async function DetalleCorrida({
           <div className="panel__pie">
             <Clock size={14} strokeWidth={2} />
             <span>
-              El trabajo lo hace el cron en segundo plano, <strong>un paso por vez</strong>. Esta
-              página se actualiza sola cada 5 segundos. En local el cron se levanta con{' '}
-              <span className="mono">npm run cron</span>; en Vercel corre solo cada minuto.
+              Esta pantalla hace avanzar el trabajo <strong>mientras está abierta</strong>, un
+              paso a la vez. Si la cerrás, la corrida queda en pausa — no se pierde nada, sigue
+              exactamente donde estaba cuando la vuelvas a abrir.
             </span>
           </div>
         )}

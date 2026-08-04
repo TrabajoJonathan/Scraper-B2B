@@ -10,9 +10,7 @@ import { PASOS } from '../../src/servicios/corridaService.ts';
 const ETIQUETA_PASO: Record<string, string> = {
   descubrir: 'Descubrir',
   contacto: 'Buscar contacto',
-  verificar: 'Verificar',
   priorizar: 'Priorizar',
-  redactar: 'Redactar',
   listo: 'Listo',
 };
 

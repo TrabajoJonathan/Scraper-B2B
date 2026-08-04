@@ -2,37 +2,31 @@ import { tick } from '../../../src/servicios/pipelineService.ts';
 import { opcional } from '../../../src/core/config.ts';
 
 /**
- * El cron: cada invocación avanza UNA corrida UN paso. No corre el pipeline
- * completo porque no cabría en el límite de tiempo de una función.
+ * El cron: cada invocación avanza UNA corrida UN paso (la más vieja de la
+ * cola). No corre el pipeline completo porque no cabría en el límite de
+ * tiempo de una función.
  *
  * ===========================================================================
- * OJO: hoy NADIE llama a esta ruta automáticamente
+ * Ruta secundaria desde el 2026-08-04: ya no hace falta para el uso normal
  * ===========================================================================
  *
- * `vercel.json` ya NO declara el cron. Decisión del jefe (reunión del 2026-08-01):
- * el plan Hobby de Vercel limita los cron a una vez por día, y un paso por día
- * no sirve para un pipeline de seis pasos. Pagar Pro no está en el presupuesto
- * todavía.
+ * Desde que `/corridas/[id]` hace avanzar la corrida sola mientras un empleado
+ * la tiene abierta (ver `app/corridas/[id]/Avanzador.tsx`), nada del uso
+ * normal de la herramienta depende de que esto corra. Se deja funcionando
+ * como herramienta manual — por ejemplo, para hacer avanzar corridas sin
+ * abrir el navegador — y protegida igual que siempre.
  *
- * Así que el pipeline avanza de dos maneras:
- *   · en local, con `npm run cron` (pega a la MISMA base de Supabase, así que
- *     también hace avanzar las corridas creadas desde la web desplegada);
- *   · a mano, llamando esta ruta con el header `Authorization: Bearer $CRON_SECRET`.
- *
- * La ruta se queda tal cual, funcionando y protegida: cuando pasen a Pro, es
- * volver a poner el bloque `crons` en `vercel.json` y nada más. No hay que
- * reescribir nada.
- *
- * Vercel manda `Authorization: Bearer $CRON_SECRET` en sus invocaciones, y esta
- * ruta lo sigue exigiendo — el hecho de que no haya cron programado no la deja
- * abierta.
+ * `vercel.json` no declara ningún cron programado (decisión del jefe, reunión
+ * del 2026-08-01: el plan Hobby de Vercel limita los cron a una vez por día).
+ * Si algún día se paga Pro y se quiere volver a un cron programado, esta ruta
+ * ya está lista: alcanza con agregar el bloque `crons` en `vercel.json`.
  *
  * ===========================================================================
  * SEGURIDAD: esta ruta NO puede ser pública
  * ===========================================================================
  *
- * Dispara trabajo que cuesta plata (llamadas a Places, Claude, verificador). Sin
- * protección, cualquiera con la URL podría vaciar el crédito llamándola en bucle.
+ * Dispara trabajo que cuesta plata (llamadas a Places). Sin protección,
+ * cualquiera con la URL podría vaciar el crédito llamándola en bucle.
  *
  * Vercel manda `Authorization: Bearer $CRON_SECRET` en sus invocaciones. Se exige
  * ese header salvo en desarrollo local, donde no hay riesgo y hace falta poder
