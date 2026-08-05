@@ -123,12 +123,6 @@ export function Nav({ emailEmpleado, accionSalir }: Props) {
             </button>
           </form>
         </div>
-
-        <div className="nav__nota">
-          v1 · Google Maps
-          <br />
-          El envío nunca es automático.
-        </div>
       </div>
     </nav>
   );
