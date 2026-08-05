@@ -96,16 +96,22 @@ export async function listarLeads(f: FiltrosLeads = {}): Promise<LeadEnPanel[]> 
     `select
        p.id as prospeccion_id, n.nombre as negocio, n.categoria_google as categoria,
        n.direccion, n.sitio_web, n.rating, n.num_resenas,
-       ct.email, ct.estado_verificacion, ct.telefono, ct.redes,
+       ct.email, ct.estado_verificacion, n.telefono, ct.redes,
        p.estado, p.score, p.razon, b.producto
      from prospecciones p
        join negocios  n on n.id = p.negocio_id
        join busquedas b on b.id = p.busqueda_id
        -- Prefiere la fila CON email si existe; si no, la única que puede
        -- haber (a lo sumo una, migración 018) es la de "sin email pero con
-       -- redes/teléfono" -- por eso sigue trayendo algo útil igual.
+       -- redes" -- por eso sigue trayendo algo útil igual.
+       --
+       -- El teléfono NO sale de acá: contactos.telefono es una columna que
+       -- nada llena en la práctica (el extractor del sitio ni siquiera busca
+       -- teléfono, solo email y redes). El teléfono real es el de Google
+       -- Places, que vive en negocios.telefono -- por eso el SELECT de
+       -- arriba lee n.telefono, no ct.telefono.
        left join lateral (
-         select email, estado_verificacion, telefono, redes from contactos
+         select email, estado_verificacion, redes from contactos
          where negocio_id = n.id
          order by (email is not null) desc, creado_en asc limit 1
        ) ct on true

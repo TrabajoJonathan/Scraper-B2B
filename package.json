@@ -21,7 +21,8 @@
     "start": "next start",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.scripts.json --noEmit",
     "sembrar": "node --env-file=.env src/scripts/sembrar-demo.ts",
-    "cron": "node --env-file=.env src/scripts/cron-local.ts"
+    "cron": "node --env-file=.env src/scripts/cron-local.ts",
+    "reprocesar:redes": "node --env-file=.env src/scripts/reprocesar-redes-historicas.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
