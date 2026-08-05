@@ -9,6 +9,24 @@
 
 import { poolPostgres } from '../core/postgres.ts';
 
+/**
+ * Órdenes disponibles para /leads.
+ *
+ * `score` es el default y el único que importa para decidir a quién escribir
+ * primero — por eso sigue siendo el que se aplica sin que el empleado toque
+ * nada. Los otros cuatro no reemplazan esa prioridad: sirven para la pregunta
+ * distinta de "¿cuáles son los negocios más establecidos de la lista?", que no
+ * tiene por qué coincidir con el orden de score.
+ */
+export const ORDENES_LEADS = [
+  'score',
+  'resenas_desc',
+  'resenas_asc',
+  'rating_desc',
+  'rating_asc',
+] as const;
+export type OrdenLeads = (typeof ORDENES_LEADS)[number];
+
 export type FiltrosLeads = {
   busquedaId?: string;
   estado?: string;
@@ -17,6 +35,21 @@ export type FiltrosLeads = {
   /** Busca en el nombre del negocio. */
   texto?: string;
   limite?: number;
+  orden?: OrdenLeads;
+};
+
+/**
+ * Mapa cerrado orden -> SQL. A propósito NO se interpola `orden` directo en el
+ * ORDER BY: aunque hoy viene de un <select> con valores fijos, la regla es que
+ * un valor que termina en una consulta SQL nunca se arma con texto del
+ * usuario, ni siquiera cuando "hoy" no hay forma de mandar otra cosa.
+ */
+const ORDER_BY: Record<OrdenLeads, string> = {
+  score: 'p.score desc nulls last, n.num_resenas desc nulls last',
+  resenas_desc: 'n.num_resenas desc nulls last, p.score desc nulls last',
+  resenas_asc: 'n.num_resenas asc nulls last, p.score desc nulls last',
+  rating_desc: 'n.rating desc nulls last, n.num_resenas desc nulls last',
+  rating_asc: 'n.rating asc nulls last, n.num_resenas desc nulls last',
 };
 
 export type LeadEnPanel = {
@@ -36,10 +69,12 @@ export type LeadEnPanel = {
 };
 
 /**
- * Lista leads con filtros, ordenados por score.
+ * Lista leads con filtros. Por defecto, ordenados por score.
  *
- * `nulls last` importa: un lead sin puntuar todavía no debe aparecer arriba de
- * uno con score 90 solo porque su score es null.
+ * `nulls last` importa en todos los órdenes, no solo en el de score: un
+ * negocio sin reseñas o sin rating cargado no debe aparecer primero en un
+ * orden descendente solo porque `null` se compara como si fuera el valor más
+ * alto.
  */
 export async function listarLeads(f: FiltrosLeads = {}): Promise<LeadEnPanel[]> {
   const { rows } = await poolPostgres().query<{
@@ -68,7 +103,7 @@ export async function listarLeads(f: FiltrosLeads = {}): Promise<LeadEnPanel[]> 
             or ($3 = 'con' and ct.email is not null)
             or ($3 = 'sin' and ct.email is null))
        and ($4::text is null or n.nombre ilike '%' || $4 || '%')
-     order by p.score desc nulls last, n.num_resenas desc nulls last
+     order by ${ORDER_BY[f.orden ?? 'score']}
      limit $5`,
     [f.busquedaId ?? null, f.estado ?? null, f.email ?? null, f.texto ?? null, f.limite ?? 100],
   );

@@ -2,7 +2,9 @@ import { Globe, Search } from 'lucide-react';
 import {
   listarLeads,
   conteoPorEstado,
+  ORDENES_LEADS,
   type FiltrosLeads,
+  type OrdenLeads,
 } from '../../src/servicios/panelService.ts';
 import { Score, VerificacionPildora, etiquetaEstado } from '../componentes/Pildoras.tsx';
 
@@ -26,11 +28,16 @@ export default async function Leads({
   // Se extrae a variable en vez de comparar dentro del spread: TypeScript no
   // conserva el narrowing a través de un spread condicional.
   const email = sp['email'];
+  // `includes` sobre el arreglo cerrado es la validación: un valor de la URL
+  // que no sea ninguno de los cinco órdenes conocidos cae al default, nunca
+  // llega a formar parte de una consulta.
+  const orden = ORDENES_LEADS.includes(sp['orden'] as OrdenLeads) ? (sp['orden'] as OrdenLeads) : undefined;
   const filtros: FiltrosLeads = {
     ...(sp['busqueda'] !== undefined ? { busquedaId: sp['busqueda'] } : {}),
     ...(sp['estado'] !== undefined && sp['estado'] !== '' ? { estado: sp['estado'] } : {}),
     ...(email === 'con' || email === 'sin' ? { email } : {}),
     ...(sp['texto'] !== undefined && sp['texto'] !== '' ? { texto: sp['texto'] } : {}),
+    ...(orden !== undefined ? { orden } : {}),
     limite: 200,
   };
 
@@ -43,8 +50,9 @@ export default async function Leads({
     <>
       <h1>Leads</h1>
       <p className="sub">
-        Ordenados por score. <strong>Nadie se descarta</strong>: los que no tienen canal
-        de contacto quedan igual en la lista, marcados, para poder revisarlos.
+        Por defecto, ordenados por score — es el orden que importa para decidir a quién
+        escribir primero. <strong>Nadie se descarta</strong>: los que no tienen canal de
+        contacto quedan igual en la lista, marcados, para poder revisarlos.
       </p>
 
       {/*
@@ -99,6 +107,30 @@ export default async function Leads({
           <option value="">Con y sin correo</option>
           <option value="con">Solo con correo</option>
           <option value="sin">Solo sin correo</option>
+        </select>
+
+        {/*
+          Orden aparte de filtro, a propósito: filtrar reduce la lista, ordenar
+          solo la reorganiza. Mezclarlos en un solo control confundiría "no
+          quiero ver esto" con "quiero ver esto último".
+
+          Reseñas y estrellas dicen qué tan establecido está un negocio — algo
+          distinto de qué tan buen prospecto es (eso ya lo dice el score, y
+          para eso ordena por defecto). No hay umbrales fijos (100+, 300+): se
+          ordena, no se recorta la lista.
+        */}
+        <select
+          id="orden"
+          name="orden"
+          aria-label="Ordenar por"
+          defaultValue={sp['orden'] ?? 'score'}
+          className="select-auto"
+        >
+          <option value="score">Score (por defecto)</option>
+          <option value="resenas_desc">Más reseñas primero</option>
+          <option value="resenas_asc">Menos reseñas primero</option>
+          <option value="rating_desc">Más estrellas primero</option>
+          <option value="rating_asc">Menos estrellas primero</option>
         </select>
 
         <button type="submit" className="secundario">
