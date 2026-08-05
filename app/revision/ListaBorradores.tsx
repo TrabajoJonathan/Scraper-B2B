@@ -8,6 +8,7 @@ type Item = {
   email: string;
   score: number | null;
   comparteBuzonCon: number;
+  producto: string;
 };
 
 /**
@@ -51,6 +52,15 @@ export function ListaBorradores({
             <Score valor={i.score} />
           </div>
           <div className="lista__meta">{i.email}</div>
+          {/*
+            El producto: antes sobraba (la cola era de UNA búsqueda, ya se
+            sabía). Ahora que puede traer varias búsquedas mezcladas, decir de
+            dónde vino cada una es lo que evita confundir "esto es para el
+            mismo producto que el anterior" cuando no lo es.
+          */}
+          <div className="lista__meta tenue" style={{ fontSize: '0.6875rem' }}>
+            {i.producto}
+          </div>
           {i.comparteBuzonCon > 0 && (
             <div className="lista__marca" title="Buzón compartido con otras sucursales">
               <Users size={11} strokeWidth={2.25} />

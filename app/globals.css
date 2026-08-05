@@ -829,6 +829,34 @@ textarea { min-height: 200px; line-height: 1.65; resize: vertical; }
 }
 .correo__razon .label { color: var(--texto-3); }
 
+/* Canales aparte del correo: teléfono, WhatsApp/Instagram/Facebook (solo
+   cuando hay un link real, nunca inferido). Texto, no botones — son datos,
+   no una acción principal; la acción principal sigue siendo Aprobar. */
+.canales {
+  display: flex;
+  gap: var(--e2);
+  flex-wrap: wrap;
+  margin-top: var(--e3);
+}
+.canales__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e1);
+  font-size: var(--t-micro);
+  color: var(--texto-2);
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-xs);
+  padding: 3px var(--e2);
+  transition: color var(--transicion), border-color var(--transicion);
+}
+.canales__item:hover { color: var(--texto); border-color: var(--borde-fuerte); }
+.canales__item svg { color: var(--texto-3); flex: none; }
+
+/* Versión chica, para la celda de /leads cuando no hay correo. */
+.canales-mini { display: flex; align-items: center; gap: var(--e1); color: var(--texto-3); }
+.canales-mini svg { flex: none; }
+
 /* Asunto con su etiqueta: en un correo el asunto es un campo, no un título de
    página. Etiquetarlo evita que se lea como el encabezado de la pantalla. */
 .correo__asunto-fila { padding: var(--e5) var(--e5) 0; }

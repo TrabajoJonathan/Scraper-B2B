@@ -1,10 +1,32 @@
 'use client';
 
 import { useState } from 'react';
-import { Globe, Mail } from 'lucide-react';
+import { Camera, Globe, Link2, Mail, MessageCircle, Phone } from 'lucide-react';
 import { accionGenerarBorradores } from '../lib/acciones.ts';
 import { Score, VerificacionPildora, etiquetaEstado } from '../componentes/Pildoras.tsx';
 import type { LeadEnPanel } from '../../src/servicios/panelService.ts';
+
+/**
+ * Qué mostrar cuando no hay email, pero sí otro canal.
+ *
+ * El objetivo es conseguir clientes, no solo mandar correos: un negocio sin
+ * correo pero con teléfono o Instagram sigue siendo un lead al que alguien
+ * puede escribirle o llamarle a mano. Solo entra un ícono por canal que
+ * REALMENTE se encontró — nunca se infiere WhatsApp a partir del teléfono.
+ */
+function CanalesLead({ lead }: { lead: LeadEnPanel }) {
+  if (lead.telefono === null && lead.redes === null) return <span className="tenue">—</span>;
+
+  return (
+    <div className="canales-mini" title="Sin correo, pero se puede contactar por acá">
+      {lead.telefono !== null && <Phone size={12} strokeWidth={2} />}
+      {lead.redes?.whatsapp !== undefined && <MessageCircle size={12} strokeWidth={2} />}
+      {lead.redes?.instagram !== undefined && <Camera size={12} strokeWidth={2} />}
+      {lead.redes?.facebook !== undefined && <Link2 size={12} strokeWidth={2} />}
+      <span className="tenue" style={{ fontSize: 'var(--t-micro)' }}>sin correo, contactable</span>
+    </div>
+  );
+}
 
 /**
  * La tabla de leads, con selección múltiple.
@@ -60,7 +82,7 @@ export function TablaLeads({ leads }: { leads: LeadEnPanel[] }) {
               </th>
               <th style={{ width: '3.5rem' }}>Score</th>
               <th>Negocio</th>
-              <th>Correo</th>
+              <th>Contacto</th>
               <th style={{ width: '6rem' }}>Reseñas</th>
               <th>Etapa</th>
             </tr>
@@ -106,7 +128,7 @@ export function TablaLeads({ leads }: { leads: LeadEnPanel[] }) {
 
                   <td>
                     {l.email === null ? (
-                      <span className="tenue">—</span>
+                      <CanalesLead lead={l} />
                     ) : (
                       <>
                         <div className="mono" style={{ fontSize: 'var(--t-micro)' }}>

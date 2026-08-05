@@ -144,6 +144,24 @@ export async function guardarDescubrimiento(
  *  - **No retroceder.** Solo se avanza desde `negocio_encontrado`. Si la
  *    prospección ya iba en `aprobado` o `enviado`, una re-corrida de la Fase 2
  *    no la devuelve a `contacto_encontrado`.
+ *
+ * ===========================================================================
+ * Redes/teléfono se guardan AUNQUE no haya email (arreglado 2026-08-04)
+ * ===========================================================================
+ *
+ * `extraerContacto()` busca redes sociales en CUALQUIER página que responda,
+ * sin importar si después encuentra un email ahí (ver contactoService.ts:
+ * "las redes se acumulan de cualquier página que responda"). Antes, esta
+ * función solo insertaba en `contactos` dentro del `if (email !== null)` — así
+ * que un negocio con Instagram linkeado pero sin email visible (el caso típico
+ * de "solo formulario de contacto") encontraba su Instagram y un instante
+ * después lo perdía, porque no había ningún INSERT que lo guardara.
+ *
+ * Esto NO cambia qué cuenta como "tiene contacto" para el pipeline ni para el
+ * score: `estadoNuevo` sigue dependiendo solo del email, exactamente igual que
+ * antes. Es exclusivamente para que el empleado pueda ver, en la ficha del
+ * lead, un canal por el que sí puede escribirle a mano — el sistema no lo usa
+ * para nada automático.
  */
 export async function registrarContacto(
   negocioId: string,
@@ -158,6 +176,8 @@ export async function registrarContacto(
 ): Promise<{ estadoNuevo: 'contacto_encontrado' | 'sin_contacto'; contactoId: string | null }> {
   return enTransaccion(async (c) => {
     let contactoId: string | null = null;
+    const redesJSON =
+      contacto.redes === undefined || contacto.redes === null ? null : JSON.stringify(contacto.redes);
 
     if (contacto.email !== null) {
       // `origen_del_correo` tiene CHECK; si el extractor devuelve algo que no
@@ -174,16 +194,22 @@ export async function registrarContacto(
            origen_del_correo = coalesce(excluded.origen_del_correo, contactos.origen_del_correo),
            email_ofuscado    = excluded.email_ofuscado
          returning id`,
-        [
-          negocioId,
-          contacto.email,
-          contacto.telefono ?? null,
-          contacto.redes === undefined || contacto.redes === null
-            ? null
-            : JSON.stringify(contacto.redes),
-          contacto.origen,
-          contacto.ofuscado ?? false,
-        ],
+        [negocioId, contacto.email, contacto.telefono ?? null, redesJSON, contacto.origen, contacto.ofuscado ?? false],
+      );
+      contactoId = rows[0]!.id;
+    } else if ((contacto.telefono ?? null) !== null || redesJSON !== null) {
+      // Sin email, pero SÍ hay algo por donde escribirle a mano. `on conflict`
+      // apunta al índice parcial de la migración 018 (a lo sumo una fila sin
+      // email por negocio): si esta prospección se re-corre, actualiza en vez
+      // de duplicar.
+      const { rows } = await c.query<{ id: string }>(
+        `insert into contactos (negocio_id, email, telefono, redes)
+         values ($1, null, $2, $3)
+         on conflict (negocio_id) where email is null do update set
+           telefono = coalesce(excluded.telefono, contactos.telefono),
+           redes    = coalesce(excluded.redes, contactos.redes)
+         returning id`,
+        [negocioId, contacto.telefono ?? null, redesJSON],
       );
       contactoId = rows[0]!.id;
     }

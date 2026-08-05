@@ -66,6 +66,14 @@ export type LeadEnPanel = {
   score: number | null;
   razon: string | null;
   producto: string;
+  /**
+   * Aparte del email a propósito: el objetivo es conseguir clientes, no solo
+   * mandar correos. Un negocio sin email pero con teléfono o Instagram sigue
+   * siendo un lead al que se puede escribir — por eso viajan siempre, tenga o
+   * no email, en vez de esconderse detrás de `email === null`.
+   */
+  telefono: string | null;
+  redes: Record<string, string> | null;
 };
 
 /**
@@ -83,17 +91,21 @@ export async function listarLeads(f: FiltrosLeads = {}): Promise<LeadEnPanel[]> 
     num_resenas: number | null; email: string | null;
     estado_verificacion: string | null; estado: string;
     score: number | null; razon: string | null; producto: string;
+    telefono: string | null; redes: Record<string, string> | null;
   }>(
     `select
        p.id as prospeccion_id, n.nombre as negocio, n.categoria_google as categoria,
        n.direccion, n.sitio_web, n.rating, n.num_resenas,
-       ct.email, ct.estado_verificacion,
+       ct.email, ct.estado_verificacion, ct.telefono, ct.redes,
        p.estado, p.score, p.razon, b.producto
      from prospecciones p
        join negocios  n on n.id = p.negocio_id
        join busquedas b on b.id = p.busqueda_id
+       -- Prefiere la fila CON email si existe; si no, la única que puede
+       -- haber (a lo sumo una, migración 018) es la de "sin email pero con
+       -- redes/teléfono" -- por eso sigue trayendo algo útil igual.
        left join lateral (
-         select email, estado_verificacion from contactos
+         select email, estado_verificacion, telefono, redes from contactos
          where negocio_id = n.id
          order by (email is not null) desc, creado_en asc limit 1
        ) ct on true
@@ -122,6 +134,8 @@ export async function listarLeads(f: FiltrosLeads = {}): Promise<LeadEnPanel[]> 
     score: r.score,
     razon: r.razon,
     producto: r.producto,
+    telefono: r.telefono,
+    redes: r.redes,
   }));
 }
 

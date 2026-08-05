@@ -189,9 +189,23 @@ export async function descartar(
  *
  * Lee de `v_correos_enviables`, o sea que ya viene con las tres puertas
  * aplicadas. Es lo que la app interna va a mostrar.
+ *
+ * ===========================================================================
+ * `busquedaId` es OPCIONAL desde el 2026-08-04 — antes era obligatorio
+ * ===========================================================================
+ *
+ * Ahora "Generar borradores" (desde /leads) puede crear borradores de VARIAS
+ * búsquedas en un solo click, porque la selección ya no está atada a una sola
+ * búsqueda. Con `busquedaId` obligatorio, la pantalla de revisión solo podía
+ * mostrar una a la vez — los borradores de la otra búsqueda quedaban
+ * generados, aprobables, pero invisibles, sin ninguna pista de que existían.
+ *
+ * Ahora sin argumento trae TODO lo pendiente, cruzando búsquedas — el mismo
+ * criterio que ya usa `/leads`. Pasar un id sigue funcionando, como filtro
+ * opcional para acotar a una sola.
  */
 export async function colaDeRevision(
-  busquedaId: string,
+  busquedaId?: string,
   limite = 50,
 ): Promise<Array<{
   correoId: string;
@@ -204,21 +218,30 @@ export async function colaDeRevision(
   razon: string | null;
   /** Otros negocios que comparten este buzón. >0 = aprobar solo uno. */
   comparteBuzonCon: number;
+  estadoVerificacion: string;
+  /** De qué búsqueda vino — hace falta mostrarlo ahora que la cola las mezcla. */
+  producto: string;
+  telefono: string | null;
+  redes: Record<string, string> | null;
 }>> {
   const { rows } = await poolPostgres().query<{
     correo_id: string; negocio: string; email: string; asunto: string;
     cuerpo: string; cta: string; score: number | null; razon: string | null;
-    comparte: string;
+    comparte: string; estado_verificacion: string; producto: string;
+    telefono: string | null; redes: Record<string, string> | null;
   }>(
     `select e.correo_id, e.negocio, e.email, e.asunto, e.cuerpo, e.cta, e.score, e.razon,
+            e.estado_verificacion, e.producto, n.telefono, ct.redes,
             (select count(*) - 1 from contactos c2
               where lower(c2.email) = lower(e.email))::text as comparte
      from v_correos_enviables e
        join prospecciones p on p.id = e.prospeccion_id
-     where p.busqueda_id = $1
+       join negocios n on n.id = e.negocio_id
+       join contactos ct on ct.id = e.contacto_id
+     where ($1::uuid is null or p.busqueda_id = $1::uuid)
      order by e.score desc nulls last
      limit $2`,
-    [busquedaId, limite],
+    [busquedaId ?? null, limite],
   );
   return rows.map((r) => ({
     correoId: r.correo_id,
@@ -230,5 +253,9 @@ export async function colaDeRevision(
     score: r.score,
     razon: r.razon,
     comparteBuzonCon: Number(r.comparte),
+    estadoVerificacion: r.estado_verificacion,
+    producto: r.producto,
+    telefono: r.telefono,
+    redes: r.redes,
   }));
 }

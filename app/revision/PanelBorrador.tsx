@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Pencil, Users, X } from 'lucide-react';
+import { Camera, Check, Link2, MessageCircle, Pencil, Phone, Users, X } from 'lucide-react';
 import { accionAprobar, accionDescartar, accionEditar } from '../lib/acciones.ts';
-import { Score } from '../componentes/Pildoras.tsx';
+import { Score, VerificacionPildora } from '../componentes/Pildoras.tsx';
 
 type Props = {
   borrador: {
@@ -16,6 +16,10 @@ type Props = {
     score: number | null;
     razon: string | null;
     comparteBuzonCon: number;
+    estadoVerificacion: string;
+    producto: string;
+    telefono: string | null;
+    redes: Record<string, string> | null;
   };
 };
 
@@ -41,6 +45,29 @@ type Props = {
 export function PanelBorrador({ borrador: b }: Props) {
   const [editando, setEditando] = useState(false);
 
+  // Solo se muestra un canal cuando hay un DATO REAL detrás — nunca se infiere
+  // WhatsApp a partir del teléfono. Ver el comentario grande más abajo.
+  //
+  // lucide-react no tiene íconos de marca (ni Instagram ni Facebook): Cámara y
+  // Link2 son los que más se acercan de su set genérico. No es ideal, pero es
+  // mejor que agregar una librería de íconos nueva solo para dos logos.
+  const canales = [
+    b.telefono !== null && {
+      icono: Phone, etiqueta: 'Teléfono', texto: b.telefono, href: `tel:${b.telefono}`,
+    },
+    b.redes?.whatsapp !== undefined && {
+      icono: MessageCircle, etiqueta: 'WhatsApp', texto: b.redes.whatsapp, href: b.redes.whatsapp,
+    },
+    b.redes?.instagram !== undefined && {
+      icono: Camera, etiqueta: 'Instagram', texto: b.redes.instagram, href: b.redes.instagram,
+    },
+    b.redes?.facebook !== undefined && {
+      icono: Link2, etiqueta: 'Facebook', texto: b.redes.facebook, href: b.redes.facebook,
+    },
+  ].filter(
+    (c): c is { icono: typeof Phone; etiqueta: string; texto: string; href: string } => c !== false,
+  );
+
   return (
     <article className="correo">
       <div className="correo__cabeza">
@@ -48,14 +75,50 @@ export function PanelBorrador({ borrador: b }: Props) {
           <div style={{ minWidth: 0 }}>
             <div className="correo__negocio">{b.negocio}</div>
             <div className="correo__para mono">{b.email}</div>
+            <p className="tenue" style={{ fontSize: 'var(--t-micro)', margin: '2px 0 0' }}>
+              {b.producto}
+            </p>
           </div>
-          <Score valor={b.score} />
+          <div style={{ textAlign: 'right', flex: 'none' }}>
+            <Score valor={b.score} />
+            <div style={{ marginTop: 'var(--e1)' }}>
+              <VerificacionPildora estado={b.estadoVerificacion} />
+            </div>
+          </div>
         </div>
 
         {b.razon !== null && (
           <p className="correo__razon">
             <span className="label">Por qué está arriba:</span> {b.razon}
           </p>
+        )}
+
+        {/*
+          Otros canales, aparte del correo. El objetivo es conseguir clientes,
+          no solo mandar correos: un negocio con Instagram o teléfono sigue
+          siendo un lead útil aunque el email sea lo único que se pueda
+          verificar. Cada fila es un dato REAL que se encontró (el teléfono
+          viene de Google Maps; Instagram/Facebook/WhatsApp, de un link real en
+          el sitio del negocio) — nunca una suposición. Por eso no dice
+          "posible WhatsApp": si no hay un link de WhatsApp confirmado,
+          simplemente no aparece esa fila.
+        */}
+        {canales.length > 0 && (
+          <div className="canales">
+            {canales.map((c) => (
+              <a
+                key={c.etiqueta}
+                href={c.href}
+                target={c.href.startsWith('tel:') ? undefined : '_blank'}
+                rel={c.href.startsWith('tel:') ? undefined : 'noopener noreferrer'}
+                className="canales__item"
+                title={c.etiqueta}
+              >
+                <c.icono size={13} strokeWidth={2} />
+                {c.texto}
+              </a>
+            ))}
+          </div>
         )}
       </div>
 
