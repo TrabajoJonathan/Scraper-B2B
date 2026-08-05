@@ -275,6 +275,17 @@ export async function generarBorradores(
        join negocios  n  on n.id = p.negocio_id
        join contactos ct on ct.negocio_id = n.id and ct.email is not null
      where p.id = any($1::uuid[])
+       -- No regenerar si ya hay un correo ACTIVO (todo menos 'descartado').
+       -- Esto tiene que estar acá, no solo en la interfaz: un POST directo al
+       -- formulario (o un futuro llamador que se olvide de filtrar) no puede
+       -- lograr lo que la Fase 5 evita desde el diseño -- sobrescribir el
+       -- texto de un correo ya APROBADO, dejando el "quién aprobó" apuntando a
+       -- un contenido que esa persona nunca vio. Un correo descartado SÍ
+       -- vuelve a dejar pasar: descartar es "no este", no "nunca más".
+       and not exists (
+         select 1 from correos co
+         where co.prospeccion_id = p.id and co.estado <> 'descartado'
+       )
      order by lower(ct.email), p.score desc nulls last`,
     [prospeccionIds],
   );

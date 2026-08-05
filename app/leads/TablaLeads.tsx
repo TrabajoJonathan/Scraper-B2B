@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Camera, Globe, Link2, Mail, MessageCircle, Phone } from 'lucide-react';
+import { Camera, Globe, Lock, Link2, Mail, MessageCircle, Phone } from 'lucide-react';
 import { accionGenerarBorradores } from '../lib/acciones.ts';
-import { Score, VerificacionPildora, etiquetaEstado } from '../componentes/Pildoras.tsx';
+import { Score, VerificacionPildora, etiquetaEstado, etiquetaCorreo } from '../componentes/Pildoras.tsx';
 import type { LeadEnPanel } from '../../src/servicios/panelService.ts';
 
 /** ¿Hay algún canal manual — teléfono o una red social con link real? */
@@ -55,11 +55,19 @@ function CanalesLead({ lead }: { lead: LeadEnPanel }) {
  *
  * Solo hay checkbox en las filas CON correo: no se puede redactar sin un canal
  * de contacto, así que ofrecer la casilla ahí sería un botón que no hace nada.
+ *
+ * Tampoco hay checkbox si `estadoCorreo` no es null: ya existe un correo
+ * vigente (cualquiera menos descartado) para ese lead. Esto es la ayuda
+ * visual, no la regla real — la regla real vive en `generarBorradores()`
+ * (redaccionService.ts), que rechaza la regeneración aunque alguien mande el
+ * formulario sin pasar por esta pantalla. Si el correo se descarta, el lead
+ * vuelve a aparecer seleccionable en la próxima carga, sin que nadie tenga
+ * que hacer nada más: es la misma consulta, mirando el mismo estado.
  */
 export function TablaLeads({ leads }: { leads: LeadEnPanel[] }) {
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
 
-  const seleccionables = leads.filter((l) => l.email !== null);
+  const seleccionables = leads.filter((l) => l.email !== null && l.estadoCorreo === null);
   const todosMarcados =
     seleccionables.length > 0 && seleccionables.every((l) => seleccionados.has(l.prospeccionId));
 
@@ -104,7 +112,11 @@ export function TablaLeads({ leads }: { leads: LeadEnPanel[] }) {
               return (
                 <tr key={l.prospeccionId} className={marcado ? 'fila--marcada' : ''}>
                   <td>
-                    {l.email !== null && (
+                    {l.email === null ? null : l.estadoCorreo !== null ? (
+                      <span className="tenue" title={etiquetaCorreo(l.estadoCorreo)}>
+                        <Lock size={13} strokeWidth={2} />
+                      </span>
+                    ) : (
                       <input
                         type="checkbox"
                         name="prospeccionId"
@@ -145,8 +157,13 @@ export function TablaLeads({ leads }: { leads: LeadEnPanel[] }) {
                         <div className="mono" style={{ fontSize: 'var(--t-micro)' }}>
                           {l.email}
                         </div>
-                        <div style={{ marginTop: '3px' }}>
+                        <div className="grupo" style={{ marginTop: '3px', gap: 'var(--e1)' }}>
                           <VerificacionPildora estado={l.estadoVerificacion} />
+                          {l.estadoCorreo !== null && (
+                            <span className="pildora" title="Ya tiene un correo vigente — no se puede regenerar">
+                              {etiquetaCorreo(l.estadoCorreo)}
+                            </span>
+                          )}
                         </div>
                       </>
                     )}

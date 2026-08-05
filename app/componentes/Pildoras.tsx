@@ -79,6 +79,22 @@ export function etiquetaEstado(estado: string): string {
 }
 
 /**
+ * Estado del correo VIGENTE de un lead (cualquiera menos 'descartado'), para
+ * la columna de selección de /leads: si ya hay uno, no se puede generar otro
+ * — ver el comentario grande en redaccionService.ts sobre por qué.
+ */
+export const ETIQUETA_CORREO: Record<string, string> = {
+  borrador: 'Borrador pendiente',
+  editado: 'Editado, pendiente',
+  aprobado: 'Ya aprobado',
+  enviado: 'Ya enviado',
+};
+
+export function etiquetaCorreo(estado: string): string {
+  return ETIQUETA_CORREO[estado] ?? estado;
+}
+
+/**
  * Score.
  *
  * Antes tenía tres colores (verde/amarillo/rojo). Ahora el tramo se distingue

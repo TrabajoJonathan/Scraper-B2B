@@ -74,6 +74,13 @@ export type LeadEnPanel = {
    */
   telefono: string | null;
   redes: Record<string, string> | null;
+  /**
+   * Estado del correo VIGENTE para este lead (cualquiera menos 'descartado'),
+   * o null si no tiene ninguno. Se expone el estado real, no solo un booleano
+   * "ya tiene borrador": para decidir si algo se puede volver a generar
+   * importa distinguir un borrador sin revisar de uno ya aprobado.
+   */
+  estadoCorreo: string | null;
 };
 
 /**
@@ -92,12 +99,13 @@ export async function listarLeads(f: FiltrosLeads = {}): Promise<LeadEnPanel[]> 
     estado_verificacion: string | null; estado: string;
     score: number | null; razon: string | null; producto: string;
     telefono: string | null; redes: Record<string, string> | null;
+    estado_correo: string | null;
   }>(
     `select
        p.id as prospeccion_id, n.nombre as negocio, n.categoria_google as categoria,
        n.direccion, n.sitio_web, n.rating, n.num_resenas,
        ct.email, ct.estado_verificacion, n.telefono, ct.redes,
-       p.estado, p.score, p.razon, b.producto
+       p.estado, p.score, p.razon, b.producto, co.estado as estado_correo
      from prospecciones p
        join negocios  n on n.id = p.negocio_id
        join busquedas b on b.id = p.busqueda_id
@@ -115,6 +123,14 @@ export async function listarLeads(f: FiltrosLeads = {}): Promise<LeadEnPanel[]> 
          where negocio_id = n.id
          order by (email is not null) desc, creado_en asc limit 1
        ) ct on true
+       -- El correo VIGENTE (cualquiera menos 'descartado'). Si hay uno, no se
+       -- puede volver a generar -- ver redaccionService.ts, que aplica la
+       -- misma regla del lado de la escritura y no solo acá en la lectura.
+       left join lateral (
+         select estado from correos
+         where prospeccion_id = p.id and estado <> 'descartado'
+         order by creado_en desc limit 1
+       ) co on true
      where ($1::uuid is null or p.busqueda_id = $1::uuid)
        and ($2::text is null or p.estado = $2::text)
        and ($3::text is null
@@ -142,6 +158,7 @@ export async function listarLeads(f: FiltrosLeads = {}): Promise<LeadEnPanel[]> 
     producto: r.producto,
     telefono: r.telefono,
     redes: r.redes,
+    estadoCorreo: r.estado_correo,
   }));
 }
 
