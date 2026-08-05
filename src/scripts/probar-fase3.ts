@@ -222,7 +222,7 @@ try {
   );
   afirmar(
     puerta.some((p) => p.estado === 'catch_all' && p.n === '1'),
-    '1 fila catch_all → HOY queda bloqueada (decisión #6 pendiente con el jefe)',
+    '1 fila catch_all → decisión #6 resuelta (2026-08-04): ya es aprobable, decide el empleado',
     JSON.stringify(puerta),
   );
 

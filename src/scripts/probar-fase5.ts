@@ -14,16 +14,30 @@ import {
   registrarBusqueda, guardarDescubrimiento, registrarContacto,
   pendientesDeContacto, marcarSinWeb,
 } from '../servicios/negocioService.ts';
-import { verificarPendientes } from '../servicios/verificarService.ts';
 import { priorizar, guardarSenalesWeb } from '../servicios/scoringService.ts';
 import { generarBorradores } from '../servicios/redaccionService.ts';
 import { aprobar, editar, descartar, colaDeRevision } from '../servicios/revisionService.ts';
 import { lectorDeFixture } from '../fixtures/places-restaurantes-panama.ts';
 import { traerDeFixture } from '../fixtures/sitios-web-panama.ts';
-import { verificadorDeFixture } from '../fixtures/verificaciones.ts';
 import { generadorDeFixture, generadorQueRechaza } from '../fixtures/borradores.ts';
 import { poolPostgres, cerrarPostgres } from '../core/postgres.ts';
 import type { SearchSpec } from '../dominio/tipos.ts';
+
+/**
+ * Lo que vería un empleado en /leads y tildaría: todo lo priorizado con
+ * correo. Reemplaza al viejo filtro de `estado_verificacion = 'verificado'`
+ * — ya no existe ese filtro automático, la selección humana ocupa su lugar.
+ */
+async function idsSeleccionables(busquedaId: string): Promise<string[]> {
+  const { rows } = await poolPostgres().query<{ id: string }>(
+    `select distinct p.id from prospecciones p
+       join contactos c on c.negocio_id = p.negocio_id
+      where p.busqueda_id = $1 and p.estado in ('priorizado', 'contacto_encontrado')
+        and c.email is not null`,
+    [busquedaId],
+  );
+  return rows.map((r) => r.id);
+}
 
 const MARCA = '[PRUEBA-F5] sitio web premium';
 const ANIO = 2026;
@@ -71,16 +85,29 @@ try {
     await guardarSenalesWeb(p.negocioId, c.sitioRespondio, c.senalesWeb, c.soloRedes);
   }
   await marcarSinWeb(busquedaId);
-  await verificarPendientes(busquedaId, { verificador: verificadorDeFixture() });
   await priorizar(busquedaId, { anioActual: ANIO });
 
-  console.log('  (fases 1-4 corridas: descubrir, contacto, verificar, priorizar)\n');
+  console.log('  (fases 1-2 y 4 corridas: descubrir, contacto, priorizar)\n');
 
   // =========================================================================
-  console.log('=== UN BORRADOR POR BUZÓN, NO POR PROSPECCIÓN ===\n');
+  console.log('=== SELECCIÓN HUMANA, NO AUTOMÁTICA (sin MillionVerifier) ===\n');
+
+  // Lo que el empleado vería en /leads: Fogón, las 2 sucursales de La Terraza
+  // (mismo buzón) y Sushi Kobe. Sin verificación real, los tres son
+  // seleccionables por igual — la decisión de escribirle a Sushi Kobe (que
+  // antes quedaba afuera por catch_all) ahora es del empleado, no del sistema.
+  const seleccion = await idsSeleccionables(busquedaId);
+  afirmar(
+    seleccion.length === 4,
+    '4 prospecciones seleccionables: Fogón + 2 sucursales de Terraza + Sushi Kobe',
+    `seleccionables=${seleccion.length}`,
+  );
+
+  // =========================================================================
+  console.log('\n=== UN BORRADOR POR BUZÓN, NO POR PROSPECCIÓN ===\n');
 
   const gen = generadorDeFixture();
-  const g = await generarBorradores(busquedaId, { generador: gen });
+  const g = await generarBorradores(seleccion, { generador: gen });
 
   console.log(`        candidatos (buzones únicos) : ${g.candidatos}`);
   console.log(`        borradores generados        : ${g.generados}`);
@@ -89,8 +116,8 @@ try {
   console.log(`        costo                       : $${g.costoUSD.toFixed(5)} USD\n`);
 
   afirmar(
-    g.candidatos === 2,
-    '2 buzones únicos verificados (Fogón y La Terraza; Sushi quedó catch_all)',
+    g.candidatos === 3,
+    '3 buzones únicos (Fogón, La Terraza, Sushi Kobe — ya no lo bloquea la verificación)',
     `candidatos=${g.candidatos}`,
   );
   afirmar(
@@ -111,8 +138,8 @@ try {
     [busquedaId],
   );
   afirmar(
-    correos[0]!.n === '2',
-    '2 correos en la base: uno por buzón, NO uno por sucursal',
+    correos[0]!.n === '3',
+    '3 correos en la base: uno por buzón, NO uno por sucursal',
     `correos=${correos[0]!.n}`,
   );
 
@@ -128,7 +155,11 @@ try {
     }
   }
   console.log('');
-  afirmar(cola.length === 2, 'la cola trae los 2 aprobables', `cola=${cola.length}`);
+  afirmar(
+    cola.length === 3,
+    'la cola trae los 3 aprobables — incluido Sushi Kobe (catch_all ya no bloquea, migración 017)',
+    `cola=${cola.length}`,
+  );
   afirmar(
     cola[0]!.score !== null && (cola[1]!.score === null || cola[0]!.score >= cola[1]!.score),
     'viene ordenada por score (el mejor primero)',
@@ -271,9 +302,13 @@ try {
     `update prospecciones set estado='priorizado' where busqueda_id=$1 and estado='correo_generado'`,
     [busquedaId],
   );
+  // Se vuelve a preguntar qué es seleccionable AHORA: el descarte de arriba
+  // movió una prospección a un estado que ya no aplica, así que no alcanza
+  // con reusar la lista de la primera vez.
+  const seleccionDeNuevo = await idsSeleccionables(busquedaId);
   let reventó = false;
   try {
-    await generarBorradores(busquedaId, { generador: generadorQueRechaza() });
+    await generarBorradores(seleccionDeNuevo, { generador: generadorQueRechaza() });
   } catch {
     reventó = true;
   }

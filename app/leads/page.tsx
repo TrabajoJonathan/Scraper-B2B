@@ -1,4 +1,4 @@
-import { Globe, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import {
   listarLeads,
   conteoPorEstado,
@@ -6,7 +6,8 @@ import {
   type FiltrosLeads,
   type OrdenLeads,
 } from '../../src/servicios/panelService.ts';
-import { Score, VerificacionPildora, etiquetaEstado } from '../componentes/Pildoras.tsx';
+import { etiquetaEstado } from '../componentes/Pildoras.tsx';
+import { TablaLeads } from './TablaLeads.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -150,69 +151,7 @@ export default async function Leads({
             {leads.length} {leads.length === 1 ? 'lead' : 'leads'}
           </p>
 
-          <div className="tabla-scroll">
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th style={{ width: '3.5rem' }}>Score</th>
-                <th>Negocio</th>
-                <th>Correo</th>
-                <th style={{ width: '6rem' }}>Reseñas</th>
-                <th>Etapa</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leads.map((l) => (
-                <tr key={l.prospeccionId}>
-                  <td>
-                    <Score valor={l.score} />
-                  </td>
-
-                  {/*
-                    Nombre primario, razón del score debajo en chico. La razón es
-                    la explicación de POR QUÉ ese lead está arriba — tiene que
-                    estar visible sin abrir nada, pero no puede competir con el
-                    nombre del negocio.
-                  */}
-                  <td>
-                    <span className="tabla__principal">{l.negocio}</span>
-                    {l.razon !== null && <span className="razon">{l.razon}</span>}
-                    {l.sitioWeb === null && (
-                      <span className="tabla__meta grupo" style={{ gap: 'var(--e1)' }}>
-                        <Globe size={11} strokeWidth={2} />
-                        sin sitio web
-                      </span>
-                    )}
-                  </td>
-
-                  <td>
-                    {l.email === null ? (
-                      <span className="tenue">—</span>
-                    ) : (
-                      <>
-                        <div className="mono" style={{ fontSize: 'var(--t-micro)' }}>
-                          {l.email}
-                        </div>
-                        <div style={{ marginTop: '3px' }}>
-                          <VerificacionPildora estado={l.estadoVerificacion} />
-                        </div>
-                      </>
-                    )}
-                  </td>
-
-                  <td className="mono tenue">
-                    {l.numResenas ?? '—'}
-                    {l.rating !== null && ` · ${l.rating}★`}
-                  </td>
-
-                  <td className="tenue" style={{ fontSize: 'var(--t-micro)' }}>
-                    {etiquetaEstado(l.estado)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
+          <TablaLeads leads={leads} />
         </>
       )}
     </>

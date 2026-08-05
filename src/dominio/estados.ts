@@ -74,18 +74,32 @@ export type EstadoVerificacion = (typeof ESTADOS_VERIFICACION)[number];
 /**
  * Puerta de envio (Via B2: "no quemamos el dominio").
  *
- * >>> DECISION PENDIENTE CON EL JEFE <<<
- * `catch_all` esta en false a proposito, como postura conservadora. En Panama
- * muchisimos dominios de PYME son catch-all (cPanel por defecto), asi que esta
- * eleccion puede recortar buena parte de la lista. La alternativa es enviarles
- * con cupo diario aparte y prioridad menor.
- * Hay que decidirlo en la Fase 3, no descubrirlo en B6. Ver ROADMAP, "Decisiones
- * pendientes con el jefe" #6.
+ * ============================================================================
+ * DECISION RESUELTA (2026-08-04) — antes estaba pendiente con el jefe
+ * ============================================================================
+ * La duda original era si `catch_all` debia bloquear el envio (postura
+ * conservadora) o dejarlo pasar (en Panama muchos dominios de PYME son
+ * catch-all por defecto). Se resolvio junto con otra decision mas grande: no
+ * se paga MillionVerifier, asi que ningun contacto real va a llegar a
+ * `verificado` nunca — con la puerta vieja (solo `verificado` pasa), la cola de
+ * revision iba a quedar vacia por construccion, sin ningun error que lo
+ * avisara.
+ *
+ * La resolucion es la misma que en el resto del proyecto: que decida el
+ * empleado, no el sistema solo. La puerta automatica bloquea unicamente lo que
+ * es un HECHO TECNICO firme (`invalido`: el verificador confirmo que el correo
+ * no existe — eso es un rebote garantizado, no una decision de negocio que
+ * alguien pueda asumir a sabiendas). Todo lo demas, incluido `pendiente` —el
+ * estado real de todo lo que se genera ahora sin verificador— pasa la puerta.
+ *
+ * Debe coincidir con `where` de `v_correos_enviables` (migracion 017): es la
+ * misma regla en dos lugares porque la vista la aplica en la escritura real y
+ * esta constante es la que un test puede leer sin tocar la base.
  */
 export const SE_PUEDE_APROBAR_ENVIO: Record<EstadoVerificacion, boolean> = {
-  pendiente: false, // sin verificar no se aprueba
+  pendiente: true, // el estado real de todo lo generado sin verificador — decide el empleado
   verificado: true,
-  catch_all: false, // <-- pendiente de decision
-  invalido: false, // regla firme de B2
-  no_encontrado: false,
+  catch_all: true, // decide el empleado, ya con la etiqueta visible en la interfaz
+  invalido: false, // regla firme: el verificador confirmo que no existe
+  no_encontrado: true, // indeterminado, no "no cumple" — mismo criterio que toda la Fase 4
 };

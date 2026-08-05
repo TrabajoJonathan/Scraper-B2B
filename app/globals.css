@@ -349,6 +349,8 @@ h2, .seccion {
 }
 .tabla tbody tr { transition: background var(--transicion); }
 .tabla tbody tr:hover { background: var(--superficie); }
+.fila--marcada, .fila--marcada:hover { background: var(--acento-suave); }
+.tabla input[type="checkbox"] { cursor: pointer; }
 .tabla__principal { font-weight: 500; color: var(--texto); }
 .tabla__meta { font-size: var(--t-micro); color: var(--texto-3); margin-top: 2px; }
 
@@ -1053,3 +1055,25 @@ textarea { min-height: 200px; line-height: 1.65; resize: vertical; }
    la página entera scrollea de lado y el sidebar se sale de la pantalla. */
 .tabla-scroll { overflow-x: auto; }
 .tabla-scroll > .tabla { min-width: 560px; }
+
+/*
+ * Barra de selección: flotante, pegada abajo, y solo existe mientras hay algo
+ * seleccionado. No ocupa espacio permanente por una acción que no siempre se
+ * usa — aparece cuando hace falta y desaparece cuando ya no.
+ */
+.barra-seleccion {
+  position: sticky;
+  bottom: var(--e5);
+  margin-top: var(--e5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e4);
+  padding: var(--e3) var(--e4);
+  background: var(--superficie-3);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--radio);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-size: var(--t-desc);
+}
+.barra-seleccion strong { color: var(--acento); font-variant-numeric: tabular-nums; }

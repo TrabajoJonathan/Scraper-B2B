@@ -6,6 +6,7 @@
 
 import { generarEstructurado, costoUSD, MODELO_BARATO } from '../core/claude.ts';
 import { enTransaccion, poolPostgres } from '../core/postgres.ts';
+import { opcional } from '../core/config.ts';
 import type { NegocioDescubierto } from '../dominio/tipos.ts';
 
 /**
@@ -95,6 +96,20 @@ export function elegirPersonalizador(n: NegocioDescubierto): string | null {
   return null;
 }
 
+/**
+ * Elige Claude real o el fixture, según haya llave.
+ *
+ * Mismo patrón que `dependenciasAutomaticas()` en pipelineService.ts, pero
+ * este no vive ahí porque ya no hay un paso automático que resolver — lo llama
+ * la acción de "Generar borradores" disparada por selección humana desde
+ * `/leads`, que no tiene ninguna corrida ni búsqueda asociada de forma única.
+ */
+export async function generadorSegunCredenciales(): Promise<Generador | undefined> {
+  return opcional('ANTHROPIC_API_KEY') !== undefined
+    ? undefined // redactar() usa Claude
+    : (await import('../fixtures/borradores.ts')).generadorDeFixture();
+}
+
 /** El generador real: Claude con salida estructurada. */
 const generadorClaude: Generador = async ({ system, usuario, modelo }) => {
   const { resultado, uso, modelo: usado } = await generarEstructurado<Borrador>({
@@ -179,31 +194,54 @@ export type ResultadoGeneracion = {
 };
 
 /**
- * Genera borradores para los leads priorizados de una búsqueda.
+ * Genera borradores para las prospecciones que un humano eligió.
+ *
+ * ===========================================================================
+ * Por qué recibe una LISTA DE IDS y no una búsqueda (cambió el 2026-08-04)
+ * ===========================================================================
+ *
+ * Antes generaba automáticamente para todo lo `priorizado` de una búsqueda que
+ * estuviera `verificado`. Eso dejó de tener sentido en dos frentes a la vez:
+ *
+ *   1. Decisión de negocio: no se paga MillionVerifier. Nada llega a
+ *      `verificado` nunca — con el filtro viejo, esta función jamás
+ *      encontraría un candidato para una corrida real.
+ *   2. Decisión de producto: se quiere que un empleado elija QUÉ leads pasan a
+ *      redacción desde `/leads` (selección múltiple → botón "Generar
+ *      borradores"), no que el sistema decida solo por todos los de una
+ *      búsqueda. `/leads` ya muestra leads de varias búsquedas a la vez, así
+ *      que la selección puede cruzar búsquedas — de ahí que el parámetro sea
+ *      una lista de prospecciones sueltas, no un `busquedaId`.
+ *
+ * La verificación (cuando exista) sigue siendo información para que el
+ * empleado decida — se ve como píldora en la fila — pero ya no es un filtro
+ * automático. Si selecciona un catch-all a sabiendas, se redacta igual: la
+ * decisión es suya, no del sistema.
  *
  * ===========================================================================
  * UN BORRADOR POR BUZÓN, NO POR PROSPECCIÓN.
  * ===========================================================================
  *
- * Mismo criterio que en la Fase 3 con el verificador, y por las mismas razones.
- * Las 2 sucursales de una cadena comparten `reservas@laterraza.com.pa`. Generar
- * un borrador para cada una significa:
+ * Esto SÍ se mantiene igual, y con más razón: dos sucursales de una cadena
+ * comparten `reservas@laterraza.com.pa`. Si el empleado selecciona las dos (a
+ * veces sin darse cuenta de que son la misma cadena), generar un borrador para
+ * cada una significa:
  *
  *  - **pagar dos llamadas a Claude** para un buzón que va a recibir UN correo
  *  - **obligar al operador a elegir** entre dos textos casi idénticos
  *
- * Así que se genera para la prospección de MAYOR score de cada buzón, y las
- * demás se cuentan en `omitidosPorBuzonCompartido`. Quedan en `priorizado` con
- * una nota en su razón: no se pierden, simplemente ya están cubiertas por el
- * correo que sí se va a enviar.
- *
- * En una cadena de 15 locales eso son 14 llamadas ahorradas.
+ * Así que se genera para la de MAYOR score de cada buzón **dentro de lo
+ * seleccionado**, y las demás se cuentan en `omitidosPorBuzonCompartido`.
+ * Quedan en `priorizado` con una nota en su razón: no se pierden, simplemente
+ * ya están cubiertas por el correo que sí se va a enviar.
  */
 export async function generarBorradores(
-  busquedaId: string,
-  opciones: { generador?: Generador; maximo?: number; modelo?: string } = {},
+  prospeccionIds: string[],
+  opciones: { generador?: Generador; modelo?: string } = {},
 ): Promise<ResultadoGeneracion> {
-  const maximo = opciones.maximo ?? 100;
+  if (prospeccionIds.length === 0) {
+    return { candidatos: 0, generados: 0, omitidosPorBuzonCompartido: 0, sinPersonalizador: 0, costoUSD: 0 };
+  }
 
   // Un candidato por buzón: el de mejor score. `distinct on` de Postgres es
   // exactamente esto — la primera fila de cada grupo según el `order by`.
@@ -224,21 +262,21 @@ export async function generarBorradores(
        p.id as prospeccion_id, ct.id as contacto_id, ct.email,
        b.producto, n.nombre, n.categoria_google, n.direccion, n.sitio_web,
        n.rating, n.num_resenas,
-       -- cuántas otras prospecciones de esta búsqueda comparten este buzón
+       -- cuántas otras prospecciones DE LO SELECCIONADO comparten este buzón.
+       -- Escaneado sobre prospeccionIds, no sobre la búsqueda: la selección
+       -- puede cruzar búsquedas y el problema real (dos correos al mismo
+       -- buzón) no distingue de cuál búsqueda salió cada una.
        (select count(*) - 1 from contactos c2
           join prospecciones p2 on p2.negocio_id = c2.negocio_id
-         where lower(c2.email) = lower(ct.email) and p2.busqueda_id = b.id
+         where lower(c2.email) = lower(ct.email) and p2.id = any($1::uuid[])
        )::text as hermanos
      from prospecciones p
        join busquedas b  on b.id = p.busqueda_id
        join negocios  n  on n.id = p.negocio_id
        join contactos ct on ct.negocio_id = n.id and ct.email is not null
-     where p.busqueda_id = $1
-       and p.estado in ('priorizado', 'contacto_encontrado')
-       and ct.estado_verificacion = 'verificado'
-     order by lower(ct.email), p.score desc nulls last
-     limit $2`,
-    [busquedaId, maximo],
+     where p.id = any($1::uuid[])
+     order by lower(ct.email), p.score desc nulls last`,
+    [prospeccionIds],
   );
 
   const r: ResultadoGeneracion = {
@@ -285,14 +323,17 @@ export async function generarBorradores(
     r.costoUSD += costo;
   }
 
-  // Las prospecciones cubiertas por el correo de un hermano: se anotan para que
-  // el operador entienda por qué no tienen borrador propio.
+  // Las prospecciones cubiertas por el correo de un hermano: se anotan para
+  // que el operador entienda por qué no tienen borrador propio. SIN filtro de
+  // búsqueda a propósito (a diferencia de antes): el hermano puede no haber
+  // sido parte de esta selección — puede ni siquiera existir todavía cuando se
+  // generó el correo que lo cubre — así que se busca por EMAIL en toda la
+  // base, no solo en `prospeccionIds`.
   await poolPostgres().query(
     `update prospecciones p
      set razon = coalesce(p.razon, '') || ' · cubierta por el correo a un buzón compartido'
      from contactos ct
      where ct.negocio_id = p.negocio_id
-       and p.busqueda_id = $1
        and p.estado = 'priorizado'
        and exists (
          select 1 from correos co
@@ -300,7 +341,6 @@ export async function generarBorradores(
           where lower(c2.email) = lower(ct.email)
        )
        and p.razon not like '%buzón compartido%'`,
-    [busquedaId],
   );
 
   return r;

@@ -261,15 +261,21 @@ try {
     [prospeccionId, contactoId],
   );
 
-  // Puerta 1: sin verificar, no aparece como enviable.
-  const { rows: sinVerificar } = await cliente.query<{ n: string }>(
+  /*
+   * Puerta de calidad (migración 017, 2026-08-04): ya no exige 'verificado'.
+   * Sin MillionVerifier, todo contacto real se queda en 'pendiente' para
+   * siempre — con la puerta vieja, la cola de revisión iba a quedar vacía por
+   * construcción. Ahora decide el empleado; el único bloqueo automático es
+   * 'invalido' (el verificador CONFIRMÓ que el correo no existe).
+   */
+  const { rows: pendiente } = await cliente.query<{ n: string }>(
     `select count(*)::text as n from v_correos_enviables where contacto_id=$1`,
     [contactoId],
   );
   afirmar(
-    sinVerificar[0]!.n === '0',
-    'puerta de calidad: un email "pendiente" NO es enviable',
-    `filas: ${sinVerificar[0]!.n}`,
+    pendiente[0]!.n === '1',
+    'puerta de calidad: "pendiente" SÍ es enviable — decide el empleado, no MillionVerifier',
+    `filas: ${pendiente[0]!.n}`,
   );
 
   await cliente.query(`update contactos set estado_verificacion='verificado' where id=$1`, [
@@ -281,9 +287,26 @@ try {
   );
   afirmar(
     verificado[0]!.n === '1',
-    'puerta de calidad: ya verificado, SI es enviable',
+    'puerta de calidad: verificado también es enviable (no cambió)',
     `filas: ${verificado[0]!.n}`,
   );
+
+  await cliente.query(`update contactos set estado_verificacion='invalido' where id=$1`, [
+    contactoId,
+  ]);
+  const { rows: invalido } = await cliente.query<{ n: string }>(
+    `select count(*)::text as n from v_correos_enviables where contacto_id=$1`,
+    [contactoId],
+  );
+  afirmar(
+    invalido[0]!.n === '0',
+    'puerta de calidad: "invalido" SÍ sigue bloqueado — es un hecho técnico, no una decisión',
+    `filas: ${invalido[0]!.n}`,
+  );
+
+  await cliente.query(`update contactos set estado_verificacion='verificado' where id=$1`, [
+    contactoId,
+  ]);
 
   // (d) Puerta de opt-out por email exacto.
   await cliente.query(

@@ -101,21 +101,27 @@ try {
 
     /*
      * Verificar y redactar ya NO son pasos del pipeline automático (decisión
-     * de negocio: sin MillionVerifier, y redactar pasa a ser una acción manual
-     * desde /leads — ver el comentario sobre PASOS en corridaService.ts). La
+     * de negocio: sin MillionVerifier, y redactar es una acción manual desde
+     * /leads — ver el comentario sobre PASOS en corridaService.ts). La
      * corrida ya está `completada` en este punto, igual que va a quedar
      * cualquier corrida real de acá en más.
      *
-     * Para que la demo siga mostrando borradores en /revision mientras el
-     * botón "Generar borradores" no existe todavía, este script llama a los
-     * mismos servicios que ese botón va a llamar más adelante — la diferencia
-     * es que acá se dispara para todos los negocios de la demo, en vez de para
-     * una selección humana.
+     * Para que la demo siga mostrando borradores en /revision, este script
+     * simula lo que hace el botón "Generar borradores": selecciona todo lo
+     * que tiene correo en esta búsqueda (como si un empleado hubiera tildado
+     * todo en /leads) y llama a los mismos servicios.
      */
     const v = await verificarPendientes(busquedaId, { verificador: verificadorDeFixture() });
     console.log(`  verificar  → ${v.llamadas} llamadas, ${v.filasActualizadas} filas`);
 
-    const g = await generarBorradores(busquedaId, { generador: generadorDeFixture() });
+    const { rows: seleccion } = await poolPostgres().query<{ id: string }>(
+      `select distinct p.id from prospecciones p
+         join contactos c on c.negocio_id = p.negocio_id
+        where p.busqueda_id = $1 and p.estado in ('priorizado', 'contacto_encontrado')
+          and c.email is not null`,
+      [busquedaId],
+    );
+    const g = await generarBorradores(seleccion.map((s) => s.id), { generador: generadorDeFixture() });
     console.log(`  redactar   → ${g.generados} borradores`);
 
     console.log('\nListo. Levantá el panel con `npm run dev` y mirá:');

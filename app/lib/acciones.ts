@@ -16,6 +16,10 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { crearCorrida } from '../../src/servicios/corridaService.ts';
 import { aprobar, editar, descartar } from '../../src/servicios/revisionService.ts';
+import {
+  generarBorradores,
+  generadorSegunCredenciales,
+} from '../../src/servicios/redaccionService.ts';
 import { CANALES, type Canal } from '../../src/dominio/tipos.ts';
 import {
   clienteConSesion,
@@ -114,6 +118,29 @@ export async function accionDescartar(datos: FormData): Promise<void> {
   const motivo = String(datos.get('motivo') ?? '').trim();
   await descartar(correoId, await usuarioParaAuditoria(), motivo === '' ? undefined : motivo);
   revalidatePath('/revision');
+}
+
+/**
+ * Genera borradores para lo que el empleado tildó en /leads.
+ *
+ * El punto de control humano que reemplaza al viejo filtro automático de
+ * verificación: antes redactar era un paso que corría solo para todo lo
+ * `verificado` de una búsqueda; ahora corre solo para lo que alguien eligió a
+ * mano, sin importar de qué búsqueda venga cada lead — por eso recibe una
+ * lista de prospecciones sueltas y no un `busquedaId`.
+ *
+ * Los checkboxes vienen todos con el mismo `name="prospeccionId"`:
+ * `getAll()` es exactamente cómo el navegador junta varios valores del mismo
+ * nombre en un formulario nativo, sin que haga falta JavaScript para eso.
+ */
+export async function accionGenerarBorradores(datos: FormData): Promise<void> {
+  const ids = datos.getAll('prospeccionId').map(String);
+  if (ids.length === 0) return; // nada seleccionado: no hay nada que hacer
+
+  const generador = await generadorSegunCredenciales();
+  await generarBorradores(ids, generador === undefined ? {} : { generador });
+
+  redirect('/revision');
 }
 
 export async function accionEditar(datos: FormData): Promise<void> {
