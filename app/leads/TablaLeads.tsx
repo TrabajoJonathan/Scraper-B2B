@@ -6,6 +6,11 @@ import { accionGenerarBorradores } from '../lib/acciones.ts';
 import { Score, VerificacionPildora, etiquetaEstado } from '../componentes/Pildoras.tsx';
 import type { LeadEnPanel } from '../../src/servicios/panelService.ts';
 
+/** ¿Hay algún canal manual — teléfono o una red social con link real? */
+function tieneCanalesManuales(lead: LeadEnPanel): boolean {
+  return lead.telefono !== null || lead.redes !== null;
+}
+
 /**
  * Qué mostrar cuando no hay email, pero sí otro canal.
  *
@@ -13,9 +18,15 @@ import type { LeadEnPanel } from '../../src/servicios/panelService.ts';
  * correo pero con teléfono o Instagram sigue siendo un lead al que alguien
  * puede escribirle o llamarle a mano. Solo entra un ícono por canal que
  * REALMENTE se encontró — nunca se infiere WhatsApp a partir del teléfono.
+ *
+ * «Sin canales de contacto» queda reservado para cuando de verdad no se
+ * encontró nada — ni email, ni teléfono, ni una red social. Si dijera eso
+ * mismo con un Instagram real al lado, sería mentirle al que revisa.
  */
 function CanalesLead({ lead }: { lead: LeadEnPanel }) {
-  if (lead.telefono === null && lead.redes === null) return <span className="tenue">—</span>;
+  if (!tieneCanalesManuales(lead)) {
+    return <span className="tenue" style={{ fontSize: 'var(--t-micro)' }}>Sin canales de contacto</span>;
+  }
 
   return (
     <div className="canales-mini" title="Sin correo, pero se puede contactar por acá">
@@ -146,8 +157,18 @@ export function TablaLeads({ leads }: { leads: LeadEnPanel[] }) {
                     {l.rating !== null && ` · ${l.rating}★`}
                   </td>
 
+                  {/*
+                    "Sin canal de contacto" al lado de un Instagram real en la
+                    columna anterior se lee como una contradicción — justo la
+                    sensación de "lead muerto" que esto tiene que evitar. Para
+                    ese caso puntual (sin_contacto CON algún canal manual) se
+                    usa una etiqueta distinta; para todo lo demás, la de
+                    siempre.
+                  */}
                   <td className="tenue" style={{ fontSize: 'var(--t-micro)' }}>
-                    {etiquetaEstado(l.estado)}
+                    {l.estado === 'sin_contacto' && tieneCanalesManuales(l)
+                      ? 'Contacto manual disponible'
+                      : etiquetaEstado(l.estado)}
                   </td>
                 </tr>
               );
