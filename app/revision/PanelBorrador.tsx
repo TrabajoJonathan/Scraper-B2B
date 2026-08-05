@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Camera, Check, Link2, MessageCircle, Pencil, Phone, Users, X } from 'lucide-react';
+import { Camera, Check, Globe, Link2, MessageCircle, Pencil, Phone, Users, X } from 'lucide-react';
 import { accionAprobar, accionDescartar, accionEditar } from '../lib/acciones.ts';
 import { Score, VerificacionPildora } from '../componentes/Pildoras.tsx';
 
@@ -20,6 +20,7 @@ type Props = {
     producto: string;
     telefono: string | null;
     redes: Record<string, string> | null;
+    sitioWeb: string | null;
   };
 };
 
@@ -63,6 +64,9 @@ export function PanelBorrador({ borrador: b }: Props) {
     },
     b.redes?.facebook !== undefined && {
       icono: Link2, etiqueta: 'Facebook', texto: b.redes.facebook, href: b.redes.facebook,
+    },
+    b.sitioWeb !== null && {
+      icono: Globe, etiqueta: 'Sitio web', texto: b.sitioWeb, href: b.sitioWeb,
     },
   ].filter(
     (c): c is { icono: typeof Phone; etiqueta: string; texto: string; href: string } => c !== false,

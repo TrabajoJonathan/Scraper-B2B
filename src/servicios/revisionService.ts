@@ -223,15 +223,17 @@ export async function colaDeRevision(
   producto: string;
   telefono: string | null;
   redes: Record<string, string> | null;
+  sitioWeb: string | null;
 }>> {
   const { rows } = await poolPostgres().query<{
     correo_id: string; negocio: string; email: string; asunto: string;
     cuerpo: string; cta: string; score: number | null; razon: string | null;
     comparte: string; estado_verificacion: string; producto: string;
     telefono: string | null; redes: Record<string, string> | null;
+    sitio_web: string | null;
   }>(
     `select e.correo_id, e.negocio, e.email, e.asunto, e.cuerpo, e.cta, e.score, e.razon,
-            e.estado_verificacion, e.producto, n.telefono, ct.redes,
+            e.estado_verificacion, e.producto, n.telefono, n.sitio_web, ct.redes,
             (select count(*) - 1 from contactos c2
               where lower(c2.email) = lower(e.email))::text as comparte
      from v_correos_enviables e
@@ -257,5 +259,6 @@ export async function colaDeRevision(
     producto: r.producto,
     telefono: r.telefono,
     redes: r.redes,
+    sitioWeb: r.sitio_web,
   }));
 }

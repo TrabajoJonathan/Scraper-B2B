@@ -6,22 +6,23 @@ import { accionGenerarBorradores } from '../lib/acciones.ts';
 import { Score, VerificacionPildora, etiquetaEstado, etiquetaCorreo } from '../componentes/Pildoras.tsx';
 import type { LeadEnPanel } from '../../src/servicios/panelService.ts';
 
-/** ¿Hay algún canal manual — teléfono o una red social con link real? */
+/** ¿Hay algún canal manual — teléfono, una red social con link real, o sitio web? */
 function tieneCanalesManuales(lead: LeadEnPanel): boolean {
-  return lead.telefono !== null || lead.redes !== null;
+  return lead.telefono !== null || lead.redes !== null || lead.sitioWeb !== null;
 }
 
 /**
  * Qué mostrar cuando no hay email, pero sí otro canal.
  *
  * El objetivo es conseguir clientes, no solo mandar correos: un negocio sin
- * correo pero con teléfono o Instagram sigue siendo un lead al que alguien
- * puede escribirle o llamarle a mano. Solo entra un ícono por canal que
- * REALMENTE se encontró — nunca se infiere WhatsApp a partir del teléfono.
+ * correo pero con teléfono, Instagram o sitio web sigue siendo un lead al que
+ * alguien puede escribirle, llamarle o visitarle la web a mano. Solo entra un
+ * ícono por canal que REALMENTE se encontró — nunca se infiere WhatsApp a
+ * partir del teléfono.
  *
  * «Sin canales de contacto» queda reservado para cuando de verdad no se
- * encontró nada — ni email, ni teléfono, ni una red social. Si dijera eso
- * mismo con un Instagram real al lado, sería mentirle al que revisa.
+ * encontró nada — ni email, ni teléfono, ni una red social, ni sitio web. Si
+ * dijera eso mismo con un Instagram real al lado, sería mentirle al que revisa.
  */
 function CanalesLead({ lead }: { lead: LeadEnPanel }) {
   if (!tieneCanalesManuales(lead)) {
@@ -34,6 +35,7 @@ function CanalesLead({ lead }: { lead: LeadEnPanel }) {
       {lead.redes?.whatsapp !== undefined && <MessageCircle size={12} strokeWidth={2} />}
       {lead.redes?.instagram !== undefined && <Camera size={12} strokeWidth={2} />}
       {lead.redes?.facebook !== undefined && <Link2 size={12} strokeWidth={2} />}
+      {lead.sitioWeb !== null && <Globe size={12} strokeWidth={2} />}
       <span className="tenue" style={{ fontSize: 'var(--t-micro)' }}>sin correo, contactable</span>
     </div>
   );
